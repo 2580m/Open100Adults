@@ -5,7 +5,8 @@ on:
     branches:
       - main
     paths:
-      - "web/**"
+      - "public/**"
+      - "scripts/build-pages.mjs"
       - ".github/workflows/sync-pages.yml"
   workflow_dispatch: {}
 
@@ -28,25 +29,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install dependencies
-        working-directory: web
-        run: npm ci
 
       - name: Build static Pages bundle
-        working-directory: web
         env:
-          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
-          NEXT_PUBLIC_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
-        run: npm run build:pages
+          PAGES_BASE_PATH: /${{ github.event.repository.name }}
+        run: node scripts/build-pages.mjs
 
       - name: Push static build to pages branch
         run: |
           rm -rf /tmp/gh-pages-stage
           mkdir -p /tmp/gh-pages-stage
-          cp -a web/out/. /tmp/gh-pages-stage/
+          cp -a out-pages/. /tmp/gh-pages-stage/
           cd /tmp/gh-pages-stage
           git init -b pages
           git config user.name "github-actions[bot]"

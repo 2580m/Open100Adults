@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Typecheck & Next.js Build
+    name: Syntax & Route Smoke Verification
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -28,22 +28,30 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: web
         run: npm ci
 
-      - name: Run TypeScript typecheck
-        working-directory: web
-        run: npm run typecheck
+      - name: Run syntax check
+        run: npm run verify
 
-      - name: Run production standalone build
-        working-directory: web
-        env:
-          NEXT_STANDALONE: "1"
-          NEXT_TELEMETRY_DISABLED: "1"
-        run: npm run build
+      - name: Smoke test HTTP and /rws endpoints
+        run: |
+          PORT=3459 ENABLE_TUNNEL=false PUBLIC_SHARE_URL=https://ci.trycloudflare.com node server.mjs &
+          SERVER_PID=$!
+          trap "kill $SERVER_PID 2>/dev/null || true" EXIT
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3459/en >/dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+          for p in /en /zh /zh/sundome /zh/sundome/remote /zh/sundome/remote/list /zh/sundome/c /en/sundome/c /rws/new /rws/lobby /api/rgate/public-url; do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" "http://127.0.0.1:3459${p}")
+            echo "${p} -> HTTP ${code}"
+            test "$code" = "200"
+          done
 
   docker:
     name: Build & Push to GHCR
@@ -89,7 +97,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/arm64,linux/amd64' }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

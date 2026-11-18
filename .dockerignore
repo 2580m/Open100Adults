@@ -1,14 +1,8 @@
 .git
 .github
-/public
 /data
-/server.mjs
-/package.json
-web/node_modules
-web/.next
-web/.tmp
-web/out
-web/scripts
+node_modules
+out-pages
 *.log
 README.md
 docker-compose.yml

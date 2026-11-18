@@ -1,11 +1,7 @@
-# Local scraped mirror (kept on disk only, excluded from source repo)
-/public/
+# Runtime data & outputs
 /data/
-/server.mjs
-/package.json
-
-# Dependencies & build outputs
 node_modules/
+out-pages/
 .next/
 out/
 *.tsbuildinfo

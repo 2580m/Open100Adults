@@ -1,0 +1,15 @@
+{
+  "name": "open100adults",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted 1:1 ad-free mirror & reverse-engineered backend for 100Adults (EN/ZH) with full /rws remote relay and built-in Cloudflare Tunnel",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "build:pages": "node scripts/build-pages.mjs",
+    "verify": "node --check server.mjs && node --check docker-entrypoint.mjs && node --check scripts/build-pages.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
