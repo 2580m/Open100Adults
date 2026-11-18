@@ -60,6 +60,7 @@ function buildBasePathShim() {
   const bp = JSON.stringify(BASE_PATH);
   return `<script id="gh-pages-basepath-shim">(function(){
 var B=${bp};
+window.__OPEN100_BASE_PATH__=B;
 function p(u){if(typeof u!=="string")return u;if(u.startsWith(B+"/")||u===B||u.startsWith("//")||!u.startsWith("/"))return u;if(/^\\/(?:_next|icons|peek|support|bx-zh\\.js|manifest\\.json|favicon\\.ico)(?:\\/|$|\\?)/.test(u))return B+u;return u;}
 function nav(u){if(typeof u!=="string")return u;if(u.startsWith(B+"/")||u===B||u.startsWith("//")||!u.startsWith("/"))return u;return B+u;}
 var origFetch=window.fetch;

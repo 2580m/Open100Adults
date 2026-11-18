@@ -927,6 +927,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname.length > 1 && pathname.endsWith("/")) {
+    if (!pathname.startsWith("/api/") && !pathname.startsWith("/rws/")) {
+      const cleanPath = url.pathname.replace(/\/+$/, "") || "/";
+      res.writeHead(302, { Location: `${cleanPath}${url.search}` });
+      res.end();
+      return;
+    }
     pathname = pathname.slice(0, -1);
   }
 
@@ -969,12 +975,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const cacheControl = pathname.startsWith("/_next/static/")
-    ? "public, max-age=31536000, immutable"
-    : "no-cache";
   res.writeHead(200, {
     "Content-Type": mime,
-    "Cache-Control": cacheControl,
+    "Cache-Control": "no-cache",
   });
   fs.createReadStream(filePath).pipe(res);
 });
