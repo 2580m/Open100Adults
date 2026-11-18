@@ -25,9 +25,10 @@
 
 - **纯净无广告**：彻底移除 GTM、Cloudflare Insights、HilltopAds、Bance、TrafficStars、FAM、Arrow 及所有姊妹站 / 外链推广组件；视频代理响应也会主动清洗推广字段。
 - **双语精简切换**：仅保留 **English (`/en`)** 与 **简体中文 (`/zh`)**，跨语言缺失的专属剧情会自动平滑回退到列表页，避免 404。
-- **纯静态与服务端双模式**：
-  - **`pages` 分支（GitHub Pages）**：自动导出所有 100% 前端可独立运行的工具（寸止游戏 + 本地视频、折返跑、飞行棋、全部 142 篇互动剧情、戒色计数器、三个百分位计算器），无需任何后端即可在线使用。
-  - **`main` 分支 / Docker 镜像**：额外提供内存房间远程操控、内置 `cloudflared` 公网单链接联机，以及试看片在线代理接口。
+- **双模式架构与分支说明**：
+  - **`pages` 分支（GitHub Pages）**：自动导出所有 100% 前端可独立运行的工具（寸止游戏 + 本地视频、双人时钟同步 `/sundome/p`、折返跑、飞行棋、全部 142 篇互动剧情、戒色计数器、三个百分位计算器），无需任何后端即可在线使用。
+  - **`dev` 分支（Route B 全动态源码版）**：基于 `Next.js 16 + custom-server.mjs + ws`，提供真实 `/rws` WebSocket 双向房间联机、围观排队、全屏播放器、`<SundomeArc>` 曲线复盘、内置 `cloudflared` 公网单链接联机，以及语音/试看片代理接口（镜像标签：`ghcr.io/2580m/open100adults:dev`）。
+  - **`main` 分支（Route A 发布版）**：稳定发布归档版本。
 - **本地优先隐私保护**：所有打卡、游戏配置、自定义指令与最佳纪录均保存在浏览器 `localStorage` / `sessionStorage`，不上传用户数据；字体与图标均已本地化。
 - **浏览器端交互引擎**：内置 Web Audio API 实时节拍器与合成音、SpeechSynthesis 语音指令播报、3D 骰子物理动画及统计分布模型。
 
@@ -45,7 +46,8 @@
 | **戒色计数器 (Streak Counter)** | `/[lang]/streak` | ✅ | ✅ | 多模式计数、月历视图、破戒归因标签、90 秒冲动呼吸计时、JSON 导入导出 |
 | **百分位计算器** | `/[lang]/size`<br>`/[lang]/stamina`<br>`/[lang]/partners` | ✅ | ✅ | 正态 CDF / 对数正态 / Natsal-3 分段分布实时计算百分位与评级 |
 | **法务声明** | `/[lang]/2257`、`/[lang]/dmca` | ✅ | ✅ | 基础合规说明页面 |
-| **远程操控 (Remote Play)** | `/[lang]/sundome/remote`<br>`/[lang]/sundome/remote/list` | — | ✅ | 内存房间建房、自动提取公网隧道链接、6 档速度、实时指令轮询 |
+| **远程操控 (Remote Play)** | `/[lang]/sundome/remote`<br>`/[lang]/sundome/remote/list`<br>`/[lang]/sundome/c` | — | ✅ | 4 步向导（1/4–4/4）、真实 `/rws` WebSocket 双向房间、圆盘/滑动条控制台、170 条短句+收藏、围观排队与内置公网隧道 |
+| **双人同频 (Partner Sync)** | `/[lang]/sundome/p` | ✅ | ✅ | 基于确定性随机种子与统一起始时钟的双端同步寸止 |
 
 > 说明：`lang` 取值为 `en` 或 `zh`。
 
@@ -127,26 +129,27 @@ Open100Adults/
 │   └── workflows/
 │       ├── docker-publish.yml   # CI 类型检查、构建与 GHCR 多架构镜像发布
 │       └── sync-pages.yml       # 自动构建静态版并强制同步至 pages 分支
-├── Dockerfile                   # 多阶段 Standalone + cloudflared 生产镜像
+├── Dockerfile                   # 多阶段 Node 22 + custom-server.mjs + cloudflared 生产镜像
 ├── docker-entrypoint.mjs        # 容器入口：按 ENABLE_TUNNEL 联动拉起 Web 与隧道
 ├── .dockerignore
 ├── docker-compose.yml
 ├── LICENSE                      # MIT License
 ├── README.md
-└── web/                         # Next.js App Router 源码工程
+└── web/                         # Next.js App Router + custom-server.mjs 源码工程
+    ├── custom-server.mjs        # Next 16 HTTP + /rws WebSocket + 语音/视频代理服务
     ├── next.config.ts
     ├── package.json
     ├── public/icons/            # 本地化工具图标与 PWA 清单
     ├── scripts/                 # 剧情提取与 Pages 静态导出脚本（build-pages.mjs）
     └── src/
         ├── app/
-        │   ├── [lang]/          # 双语页面与动态路由
+        │   ├── [lang]/          # 双语页面与动态路由（含 sundome/c、sundome/p 等）
         │   ├── api/             # sundome-lab 代理、rgate 房间与公网地址探测、story-vote
-        │   └── globals.css      # 玻璃拟态与默认主题 Token
+        │   └── globals.css      # 玻璃拟态、控制器与剧场样式
         ├── components/          # Header / Footer / LanguageSwitcher / 各工具交互组件
-        ├── data/                # i18n 文案、工具元数据、142 篇独立剧情 JSON
+        ├── data/                # i18n 文案、工具元数据、142 篇独立剧情与语音索引
         ├── fonts/               # 本地 Geist & Instrument Serif woff2 字体
-        └── lib/stats.ts         # 百分位统计与 Natsal-3 拟合模型
+        └── lib/                 # remoteProtocol (/rws 客户端)、partnerSync、voicePlayer、stats
 ```
 
 ---
@@ -154,8 +157,8 @@ Open100Adults/
 ## CI/CD 自动化流水线
 
 1. **Docker & GHCR 发布（[.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml)）**：
-   - 运行 `npm ci`、`npm run typecheck`、`NEXT_STANDALONE=1 npm run build`；
-   - 构建 `linux/amd64` 与 `linux/arm64` 双架构镜像推送至 `ghcr.io/2580m/open100adults`（推送 `main` 生成 `latest`/`main`/`sha-*`，推送 `v*.*.*` Tag 生成语义化版本标签）。
+   - 运行 `npm ci`、`npm run typecheck`、`node --check custom-server.mjs`、`npm run build`，并启动 `custom-server.mjs` 执行全路由 / `/rws` / `RSC` 冒烟校验；
+   - 构建 `linux/amd64` 与 `linux/arm64` 双架构镜像推送至 `ghcr.io/2580m/open100adults`（推送 `dev` 生成 `dev` 标签，推送 `main` 生成 `latest`/`main`/`sha-*`，推送 `v*.*.*` Tag 生成语义化版本标签）。
 2. **GitHub Pages 分支同步（[.github/workflows/sync-pages.yml](.github/workflows/sync-pages.yml)）**：
    - 当 `web/**` 更新时自动执行 `npm run build:pages`，将可纯静态运行的全部工具页与 142 篇剧情页面导出并推送至 `pages` 分支根目录（含 `.nojekyll` 与语言自动跳转入口页）。
 

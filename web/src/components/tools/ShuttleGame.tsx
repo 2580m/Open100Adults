@@ -139,6 +139,9 @@ export function ShuttleGame({
         state.total += 1;
         state.completed += 1;
         state.leg = state.leg === "out" ? "back" : "out";
+        if (mode === "stops") {
+          void playShuttleCue(state.leg === "back" ? "stop" : "go");
+        }
 
         if (state.completed >= config.shuttles) {
           state.completed = 0;
@@ -147,6 +150,7 @@ export function ShuttleGame({
             finishRun(state.total, SHUTTLE_LEVELS.length);
             return;
           }
+          void playShuttleCue(`level_${state.level}`);
           setLevel(state.level);
           setTotal(state.total);
           setCompletedInLevel(0);
@@ -202,6 +206,43 @@ export function ShuttleGame({
     if (audioRef.current.state === "suspended") {
       void audioRef.current.resume();
     }
+  }
+
+  const shuttleRawCacheRef = useRef(new Map<string, Promise<ArrayBuffer | null>>());
+  const shuttleBufCacheRef = useRef(new Map<string, AudioBuffer | null>());
+
+  async function playShuttleCue(key: string) {
+    const ctx = audioRef.current;
+    if (!ctx || ctx.state === "closed") return;
+    const cacheKey = `${locale}/${key}`;
+    let buf = shuttleBufCacheRef.current.get(cacheKey);
+    if (buf === undefined) {
+      let pending = shuttleRawCacheRef.current.get(cacheKey);
+      if (!pending) {
+        pending = fetch(`/voice/shuttle/${cacheKey}.mp3`)
+          .then((res) => (res.ok ? res.arrayBuffer() : null))
+          .catch(() => null);
+        shuttleRawCacheRef.current.set(cacheKey, pending);
+      }
+      const raw = await pending;
+      if (!raw) {
+        shuttleBufCacheRef.current.set(cacheKey, null);
+        return;
+      }
+      try {
+        buf = await ctx.decodeAudioData(raw.slice(0));
+      } catch {
+        buf = null;
+      }
+      shuttleBufCacheRef.current.set(cacheKey, buf);
+    }
+    if (!buf || (ctx.state as string) === "closed") return;
+    try {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start();
+    } catch {}
   }
 
   function beep(frequency: number, duration: number) {

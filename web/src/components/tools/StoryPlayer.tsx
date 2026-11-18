@@ -58,11 +58,33 @@ export function StoryPlayer({
   const [endingKind, setEndingKind] = useState<EndingKind | null>(null);
 
   const audioRef = useRef<AudioContext | null>(null);
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceIndexRef = useRef<Record<string, string> | null>(null);
   const edgesRef = useRef(0);
 
   useEffect(() => {
     if (window.sessionStorage.getItem("story:age") === "1") setAccepted(true);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch(`/story-voice/${encodeURIComponent(locale)}/${encodeURIComponent(story.id)}/index.json`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: Record<string, string> | null) => {
+        if (active && data && typeof data === "object") {
+          voiceIndexRef.current = data;
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      if (voiceAudioRef.current) {
+        try {
+          voiceAudioRef.current.pause();
+        } catch {}
+      }
+    };
+  }, [locale, story.id]);
 
   useEffect(() => {
     return () => {
@@ -197,9 +219,35 @@ export function StoryPlayer({
   }
 
   function speak(text: string) {
-    if (!voice || !text || typeof window === "undefined" || !window.speechSynthesis) {
+    if (!voice || !text || typeof window === "undefined") {
       return;
     }
+    if (voiceAudioRef.current) {
+      try {
+        voiceAudioRef.current.pause();
+      } catch {}
+    }
+    const mapped = voiceIndexRef.current?.[text.trim()];
+    if (mapped && typeof Audio !== "undefined") {
+      try {
+        const el = voiceAudioRef.current ?? new Audio();
+        voiceAudioRef.current = el;
+        el.src = mapped.startsWith("/")
+          ? mapped
+          : `/story-voice/${encodeURIComponent(locale)}/${encodeURIComponent(story.id)}/${mapped}`;
+        void el.play().catch(() => {
+          if (window.speechSynthesis) {
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = locale === "zh" ? "zh-CN" : "en-US";
+            u.rate = 0.98;
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(u);
+          }
+        });
+        return;
+      } catch {}
+    }
+    if (!window.speechSynthesis) return;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = locale === "zh" ? "zh-CN" : "en-US";
     utterance.rate = 0.98;

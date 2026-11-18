@@ -1,17 +1,18 @@
-# Route B Preparation Roadmap (`dev` Branch)
+# Route B Architecture & Parity Checklist (`dev` Branch)
 
-> **Status: PREPARED / PAUSED** — Do **NOT** begin Route B rewrites yet.
-> Route A (`main`, `v1.0.0`) delivers 100% 1:1 original site parity. This `dev` branch preserves the clean-room Next.js (`web/`) architecture and CI/CD pipeline (`ghcr.io/2580m/open100adults:dev`) ready for future Route B work pending explicit user approval.
+> **Status: IMPLEMENTED ON `dev`** — 100% Dynamic Source-Code Architecture (`Next.js 16 + custom-server.mjs + /rws WebSocket + cloudflared`), with `main` (`v1.0.1` Route A) preserved untouched.
 
-## Planned Parity & Rebuild Checklist (Paused)
+## Completed Milestones
 
-- [ ] **`/sundome/remote` 4-Step Wizard (1/4 – 4/4)**
-  - Rebuild the step-by-step wizard (role selection -> opponent mode public/private -> session preferences/wishes/body focus -> room link & waiting lobby).
-- [ ] **`/sundome/c` Controller Console & Spectator Queue**
-  - Match original UI layout, 50+ quick commands, beat/BPM drive controls, stamina/edge limits, private chat & canned phrases (`say`/`line`), and spectator queue (`watch`/`queue`).
-- [ ] **`/sundome` Solo Edging Game Parity**
-  - Match full-screen video background overlay, sample video picker (`/api/sundome-lab/*`), local video upload, settings drawers, shuttle voice audio, and finish/ruined/denied states.
-- [ ] **`/sundome/p` Partner Synchronized Mode**
-  - Deterministic seed/clock-based dual-device synchronized instruction schedule and share link generation.
-- [ ] **Remaining Games & Tools Parity**
-  - Align all `/tools/*` and story/game routes under `web/` to match original mechanics, typography, and bilingual (`en` / `zh`) strings 1:1.
+- [x] **Real-Time WebSocket Backend (`web/custom-server.mjs`)**
+  - Unified HTTP + WebSocket server running standard Next.js `.next` production build with `/rws` rooms, lobby, watch/queue promotion, `/api/rgate/public-url` Cloudflare Tunnel detection, `/voice/*` & `/story-voice/*` proxy, and sanitized `/api/sundome-lab/*` video catalog.
+- [x] **`/sundome/remote` 4-Step Wizard (1/4 – 4/4 & `#control` 2/2)**
+  - Restored exact step-by-step flow (Role -> Public/Private -> Body/Settings/Wishes/Limits/Extensions -> Waiting Lobby + Auto-start), `#control` live lobby + invite link creator, and `#join.<room>.<key>` direct join.
+- [x] **`/sundome/c` Controller Console & Spectator Queue**
+  - Restored `.rp` / `.rp-hero` / `.rp-deck` (`disc` Dial & `slider` Bar layouts), 6 drive levels + `+20` up to 300 BPM, 5-level grip, 170 quick phrases across 12 categories + customizable Favorites, private `say` input, `allow`/`deny` verdicts, `extend`/`restart` penalties, `now` release, `thx` replies, desktop keyboard shortcuts, and live `RemoteWatch` + FIFO `RemoteFull` queue takeover.
+- [x] **`/sundome` Solo Edging Game Parity**
+  - Full-screen `[data-sundome="play"]` + `[data-sundome-bg]` stage, dim slider, fit toggle, pause-on-stop, double-tap `±10s` seek flash, `browse` video catalog, Chinese actor `/voice/zh/*` MP3 cue playback with SpeechSynthesis fallback, `.rr` player reaction drawer + `ReactSettingsModal`, and `<SundomeArc>` arousal curve on finish.
+- [x] **`/sundome/p` Partner Synchronized Mode**
+  - Deterministic `mulberry32(seed)` command schedule aligned to `startAt` clock with pre-start countdown and mid-session auto-sync.
+- [x] **Shuttle & Stories Voice Polish + Bilingual Streamlining**
+  - `/voice/shuttle/*` decoded `AudioBuffer` cues in `ShuttleGame`, `/story-voice/*` optional narration lookup in `StoryPlayer`, strictly bilingual (`en` / `zh`) with zero ads or tracking scripts.

@@ -125,7 +125,25 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const [root, code, leaf] = path;
 
   if (root === "public-url") {
-    return NextResponse.json({ ok: true, ...(await resolvePublicOrigin()) });
+    const info = await resolvePublicOrigin();
+    return NextResponse.json({
+      ok: true,
+      publicOrigin: info.origin,
+      origin: info.origin,
+      source: info.source,
+      tunnelEnabled: info.tunnelEnabled,
+      tunnelReady: Boolean(info.origin),
+    });
+  }
+
+  if (root === "lobby") {
+    return NextResponse.json({
+      ag: 0,
+      n: 0,
+      by: {},
+      rooms: [],
+      watch: [],
+    });
   }
 
   if (root !== "rooms") {

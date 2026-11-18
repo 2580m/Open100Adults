@@ -1,8 +1,30 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
+import { ReactSettingsModal, GearIcon } from "@/components/tools/RemoteCtlSettingsModal";
+import { Phrase, RemoteElapsed, StarIcon, WatchPill } from "@/components/tools/RemoteShared";
+import { SundomeArc, type SundomeArcMode, type SundomeTrace } from "@/components/tools/SundomeArc";
+import { PARTNER_LEAD_MS, PARTNER_TEXT, PARTNER_VERSION } from "@/data/partnerCopy";
+import {
+  LIMITS_TEXT,
+  REMOTE_AFTER,
+  REMOTE_CONSTANTS,
+  REMOTE_CTL,
+  REMOTE_DRIVE,
+  REMOTE_MORE,
+  REMOTE_PAGE,
+  REMOTE_READY,
+  REMOTE_TEXT,
+  REMOTE_V2,
+  REMOTE_WISH,
+} from "@/data/remoteFullCopy";
 import {
   sundomeCopy,
   type CommandType,
@@ -11,12 +33,55 @@ import {
   type SundomeDifficulty,
   type SundomeEnding,
 } from "@/data/sundomeCopy";
+import { IS_STATIC_EXPORT, type Locale, type VariantKey } from "@/data/tools";
 import {
-  IS_STATIC_EXPORT,
-  localePath,
-  type Locale,
-  type VariantKey,
-} from "@/data/tools";
+  PARTNER_APP,
+  encodePartner,
+  formatStartAt,
+  mulberry32,
+  newSeed,
+  partnerPhase,
+  partnerShareUrl,
+  type PartnerPayload,
+} from "@/lib/partnerSync";
+import {
+  RemoteLink,
+  allowedParts,
+  capBpm,
+  cleanWishes,
+  controllerHref,
+  createRemoteRoom,
+  grip5Of,
+  gripAllowed,
+  gripWire,
+  loadExtMax,
+  loadLimits,
+  plainLine,
+  reactCatsOf,
+  reactFavsOf,
+  remotePartsOf,
+  saveExtMax,
+  saveLimits,
+  usePublicOrigin,
+  useReactPrefs,
+  variantToBody,
+  type BodyKind,
+  type BodyPart,
+  type Grip5,
+  type RemoteLimits,
+  type RemoteMessage,
+  type RemoteStatus,
+  type RemoteWishKey,
+  type RoomCredentials,
+} from "@/lib/remoteProtocol";
+import {
+  ZH_ACTORS,
+  defaultVoiceActor,
+  playVoiceOrSpeech,
+  stopVoiceFiles,
+  voiceActorLabels,
+  type VoiceActorId,
+} from "@/lib/voicePlayer";
 
 type Phase =
   | "idle"
@@ -25,52 +90,55 @@ type Phase =
   | "permission"
   | "denied"
   | "ruined"
+  | "overtime"
   | "finished";
 
-type SampleSource = "samples" | "alt-samples";
+type SampleSource = "samples" | "alt-samples" | "browse";
 
 interface SampleItem {
-  cid: string;
+  id: string;
   title: string;
-  actress?: string;
-  image?: string;
-  mp4?: string;
+  previewUrl: string;
+  posterUrl?: string;
+  durationSec?: number;
 }
 
-const DURATIONS = [3, 5, 10, 15, 20, 30] as const;
-const SAMPLE_PAGE_SIZE = 8;
+const STAGE_BG: Record<string, string> = {
+  stroke: "#0c3f2c",
+  slow: "#4d3400",
+  stop: "#5c0d16",
+  paused: "#141014",
+};
+
+const AGE_KEY = "open100adults:age18";
+const CUSTOM_KEY = "sundome:custom";
+const SETTINGS_KEY = "sundome:settings";
 
 function formatTime(seconds: number): string {
-  const safe = Math.max(0, seconds);
-  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
+  const safe = Math.max(0, Math.floor(seconds));
+  const mins = Math.floor(safe / 60);
+  const secs = safe % 60;
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
-function randomOf<T>(items: T[]): T {
-  return items[Math.floor(Math.random() * items.length)];
+function randomOf<T>(items: T[], rng: () => number = Math.random): T {
+  return items[Math.floor(rng() * items.length)];
 }
 
 function adaptVariantText(
   text: string,
-  variant: VariantKey | undefined,
   locale: Locale,
+  body: BodyKind,
 ): string {
-  if (variant !== "women" && variant !== "lesbian") return text;
+  if (body !== "female" && body !== "lesbian") return text;
   if (locale === "zh") {
     return text
-      .replaceAll("可以射", "可以高潮")
-      .replaceAll("不许射", "不许高潮")
-      .replaceAll("废射", "毁灭高潮")
-      .replaceAll("射前", "高潮前")
-      .replaceAll("握紧", "轻揉")
-      .replaceAll("不许握", "不许重按")
-      .replaceAll("从根部到顶端", "从外侧到敏感处")
-      .replaceAll("沿着柱身", "沿着敏感处")
-      .replaceAll("沿柱身", "沿敏感处")
-      .replaceAll("顶端", "敏感点");
+      .replace(/龟头/g, "阴蒂")
+      .replace(/棒身|阴茎/g, "花瓣")
+      .replace(/射精/g, "高潮")
+      .replace(/射出来/g, "泄出来");
   }
   return text
-    .replace(/\bstrokes\b/gi, "touches")
-    .replace(/\bstroke\b/gi, "touch")
     .replace(/\bshaft\b/gi, "sensitive area")
     .replace(/\btip\b/gi, "clit")
     .replace(/\bhead\b/gi, "clit")
@@ -78,140 +146,319 @@ function adaptVariantText(
     .replace(/\bcome\b/gi, "finish");
 }
 
+function toArcMode(t: CommandType): SundomeArcMode {
+  return t === "stroke" ? "go" : t;
+}
+
+function mapDifficultyForWire(d: SundomeDifficulty): number {
+  return d === "easy" ? 0 : d === "normal" ? 1 : d === "hard" ? 2 : 3;
+}
+
 export function SundomeGame({
   locale,
   variant,
+  remoteOnly,
+  remoteInvite,
+  onRemoteBack,
+  partner,
 }: {
   locale: Locale;
   variant?: VariantKey;
+  remoteOnly?: "open" | "link";
+  remoteInvite?: { room: string; key: string };
+  onRemoteBack?: () => void;
+  partner?: PartnerPayload;
 }) {
   const copy = sundomeCopy[locale];
+  const rText = REMOTE_TEXT[locale];
+  const rMore = REMOTE_MORE[locale];
+  const rPage = REMOTE_PAGE[locale];
+  const rReady = REMOTE_READY[locale];
+  const rAfter = REMOTE_AFTER[locale];
+  const rDrive = REMOTE_DRIVE[locale];
+  const rWish = REMOTE_WISH[locale];
+  const rV2 = REMOTE_V2[locale];
+  const rCtl = REMOTE_CTL[locale];
+  const limText = LIMITS_TEXT[locale];
+  const pText = PARTNER_TEXT[locale];
 
+  const { publicOrigin } = usePublicOrigin();
+  const reactPrefs = useReactPrefs();
+  const actorLabels = useMemo(() => voiceActorLabels(), []);
+
+  // Core setup state
   const [hydrated, setHydrated] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
-  const [durationMode, setDurationMode] = useState<number | "custom">(5);
+  const [body, setBody] = useState<BodyKind>(() => variantToBody(variant));
+  const [durationMode, setDurationMode] = useState<number | "custom">(
+    partner?.s.duration ?? 5,
+  );
   const [customMinutes, setCustomMinutes] = useState("10");
-  const [difficulty, setDifficulty] = useState<SundomeDifficulty>("normal");
-  const [ending, setEnding] = useState<SundomeEnding>("lottery");
+  const [difficulty, setDifficulty] = useState<SundomeDifficulty>(
+    partner?.s.difficulty ?? "normal",
+  );
+  const [ending, setEnding] = useState<SundomeEnding>(
+    partner?.s.ending ?? "lottery",
+  );
   const [metronome, setMetronome] = useState(true);
   const [voice, setVoice] = useState(true);
+  const [voiceActor, setVoiceActor] = useState<VoiceActorId>(() =>
+    defaultVoiceActor("female"),
+  );
   const [volume, setVolume] = useState(0.6);
-  const [customCommands, setCustomCommands] = useState<CustomCommand[]>([]);
+  const [customCommands, setCustomCommands] = useState<CustomCommand[]>(
+    partner?.s.custom ?? [],
+  );
   const [customText, setCustomText] = useState("");
   const [customType, setCustomType] = useState<CommandType>("stroke");
   const [customBpm, setCustomBpm] = useState("80");
 
-  const [current, setCurrent] = useState<SundomeCommand | null>(null);
-  const [remaining, setRemaining] = useState(0);
-  const [commandRemaining, setCommandRemaining] = useState(0);
-  const [edges, setEdges] = useState(0);
-  const [edgeBonus, setEdgeBonus] = useState(0);
-  const [permissionLeft, setPermissionLeft] = useState(10);
-  const [overtimeNotice, setOvertimeNotice] = useState(false);
-
+  // Video & stage presentation settings
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoName, setVideoName] = useState<string | null>(null);
   const [videoMuted, setVideoMuted] = useState(true);
   const [videoVolume, setVideoVolume] = useState(0.6);
+  const [videoDim, setVideoDim] = useState(70);
+  const [videoFit, setVideoFit] = useState<"contain" | "cover">("contain");
+  const [pauseVideoOnStop, setPauseVideoOnStop] = useState(false);
   const [samplesOpen, setSamplesOpen] = useState(false);
   const [sampleSource, setSampleSource] = useState<SampleSource>("samples");
   const [samples, setSamples] = useState<SampleItem[]>([]);
+  const [browseQuery, setBrowseQuery] = useState("");
+  const [browseGenre, setBrowseGenre] = useState("");
+  const [browsePage, setBrowsePage] = useState(1);
+  const [browseTotalPages, setBrowseTotalPages] = useState(1);
   const [samplesLoading, setSamplesLoading] = useState(false);
   const [samplesError, setSamplesError] = useState(false);
-  const [sampleQuery, setSampleQuery] = useState("");
+  const [sampleSearch, setSampleSearch] = useState("");
   const [samplePage, setSamplePage] = useState(0);
   const [videoPlayError, setVideoPlayError] = useState(false);
+  const [seekFlash, setSeekFlash] = useState<"-10s" | "+10s" | null>(null);
 
-  const audioRef = useRef<AudioContext | null>(null);
+  // Active play state
+  const [timeLeft, setTimeLeft] = useState(300);
+  const [totalSeconds, setTotalSeconds] = useState(300);
+  const [edges, setEdges] = useState(0);
+  const [cmdCount, setCmdCount] = useState(0);
+  const [command, setCommand] = useState<SundomeCommand>(copy.commands.stroke[0]);
+  const [edgeCooldown, setEdgeCooldown] = useState(0);
+  const [activeRoll, setActiveRoll] = useState<number | null>(null);
+  const [extendRound, setExtendRound] = useState(0);
+
+  // Trace for SundomeArc
+  const [doneTrace, setDoneTrace] = useState<SundomeTrace | null>(null);
+  const traceRef = useRef<SundomeTrace>({ edges: [], segs: [] });
+  const playStartedAtRef = useRef<number>(0);
+
+  // Remote setup / connection state
+  const [wishes, setWishes] = useState<RemoteWishKey[]>([]);
+  const [limits, setLimits] = useState<RemoteLimits>({});
+  const [extMax, setExtMax] = useState<number>(3);
+  const [extUsed, setExtUsed] = useState<number>(0);
+  const [reactSettingsOpen, setReactSettingsOpen] = useState(false);
+  const [roomCreds, setRoomCreds] = useState<RoomCredentials | null>(null);
+  const [makingRoom, setMakingRoom] = useState(false);
+  const [makeRoomError, setMakeRoomError] = useState(false);
+  const [waitingSince, setWaitingSince] = useState<number | null>(null);
+  const [remoteStatus, setRemoteStatus] = useState<RemoteStatus>("closed");
+  const [peerOnline, setPeerOnline] = useState(false);
+  const [remoteCopied, setRemoteCopied] = useState(false);
+  const [autoCountdown, setAutoCountdown] = useState<number | null>(null);
+
+  // Remote live overrides during session
+  const [remoteDrive, setRemoteDrive] = useState<"auto" | "stop" | number>("auto");
+  const [remotePart, setRemotePart] = useState<BodyPart | undefined>(undefined);
+  const [remoteGrip, setRemoteGrip] = useState<Grip5>("normal");
+  const [remoteVerdict, setRemoteVerdict] = useState<"allow" | "deny" | null>(null);
+  const [remoteOverlay, setRemoteOverlay] = useState<{ text: string; until: number } | null>(null);
+  const [watchCount, setWatchCount] = useState(0);
+  const [queueCount, setQueueCount] = useState(0);
+  const [thxSent, setThxSent] = useState<string | null>(null);
+  const [thxGot, setThxGot] = useState<string | null>(null);
+
+  // Player reaction drawer (.rr) state
+  const [reactCollapsed, setReactCollapsed] = useState(false);
+  const [reactCatIdx, setReactCatIdx] = useState(0);
+  const [reactSentKey, setReactSentKey] = useState<string | null>(null);
+  const [arousalLevel, setArousalLevel] = useState<number>(0);
+  const [quitArmed, setQuitArmed] = useState(false);
+
+  // Partner 2P link sharing & sync state
+  const [partnerUrl, setPartnerUrl] = useState<string | null>(null);
+  const [partnerStartAt, setPartnerStartAt] = useState<number | null>(null);
+  const [partnerCopied, setPartnerCopied] = useState(false);
+  const [partnerClock, setPartnerClock] = useState(() => Date.now());
+
+  // Refs
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const remainingRef = useRef(0);
-  const commandRemainingRef = useRef(0);
-  const commandIndexRef = useRef(0);
-  const lastCommandRef = useRef<string | null>(null);
-  const edgeBonusRef = useRef(0);
-  const edgesRef = useRef(0);
-  const totalRef = useRef(300);
-  const voiceRef = useRef(voice);
-  const customCommandsRef = useRef(customCommands);
+  const reactPagerRef = useRef<HTMLDivElement | null>(null);
+  const remoteLinkRef = useRef<RemoteLink | null>(null);
+  const phaseRef = useRef<Phase>(phase);
   const difficultyRef = useRef(difficulty);
   const endingRef = useRef(ending);
+  const commandRef = useRef(command);
+  const timeLeftRef = useRef(timeLeft);
+  const totalSecondsRef = useRef(totalSeconds);
+  const edgesRef = useRef(edges);
+  const cmdCountRef = useRef(cmdCount);
+  const metronomeRef = useRef(metronome);
+  const voiceRef = useRef(voice);
+  const voiceActorRef = useRef(voiceActor);
+  const volumeRef = useRef(volume);
+  const customRef = useRef(customCommands);
+  const lastTapLeftRef = useRef(0);
+  const lastTapRightRef = useRef(0);
+  const partnerStepIdxRef = useRef(-1);
+  const remoteVerdictRef = useRef(remoteVerdict);
+  const limitsRef = useRef(limits);
+  const bodyRef = useRef(body);
+  const remoteDriveRef = useRef(remoteDrive);
+  const remotePartRef = useRef(remotePart);
+  const remoteGripRef = useRef(remoteGrip);
+  const extMaxRef = useRef(extMax);
+  const extUsedRef = useRef(extUsed);
+  const arousalRef = useRef(arousalLevel);
+  const nextCmdAtRef = useRef<number>(0);
 
-  voiceRef.current = voice;
-  customCommandsRef.current = customCommands;
+  phaseRef.current = phase;
   difficultyRef.current = difficulty;
   endingRef.current = ending;
+  commandRef.current = command;
+  timeLeftRef.current = timeLeft;
+  totalSecondsRef.current = totalSeconds;
+  edgesRef.current = edges;
+  cmdCountRef.current = cmdCount;
+  metronomeRef.current = metronome;
+  voiceRef.current = voice;
+  voiceActorRef.current = voiceActor;
+  volumeRef.current = volume;
+  customRef.current = customCommands;
+  remoteVerdictRef.current = remoteVerdict;
+  limitsRef.current = limits;
+  bodyRef.current = body;
+  remoteDriveRef.current = remoteDrive;
+  remotePartRef.current = remotePart;
+  remoteGripRef.current = remoteGrip;
+  extMaxRef.current = extMax;
+  extUsedRef.current = extUsed;
+  arousalRef.current = arousalLevel;
 
+  const isRemote = !!roomCreds || !!remoteInvite;
+  const effectiveMinutes = useMemo(() => {
+    if (durationMode === "custom") {
+      const parsed = Number.parseInt(customMinutes, 10);
+      return Number.isFinite(parsed) && parsed >= 1 && parsed <= 90 ? parsed : 10;
+    }
+    return durationMode;
+  }, [durationMode, customMinutes]);
+
+  const diffInfo = copy.difficulties[difficulty];
+
+  // Hydrate stored prefs
   useEffect(() => {
-    if (window.sessionStorage.getItem("sundome:age") === "1") {
-      setAccepted(true);
-    }
-    const raw = window.localStorage.getItem("sundome:custom");
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as CustomCommand[];
-        if (Array.isArray(parsed)) {
-          setCustomCommands(
-            parsed.filter(
-              (item) =>
-                item &&
-                typeof item.text === "string" &&
-                (item.type === "stroke" || item.type === "slow" || item.type === "stop") &&
-                typeof item.bpm === "number",
-            ),
-          );
-        }
-      } catch {
-        // Ignore malformed custom commands.
+    try {
+      const storedAge = window.localStorage.getItem(AGE_KEY);
+      if (storedAge === "1") setAccepted(true);
+
+      const rawCustom = window.localStorage.getItem(CUSTOM_KEY);
+      if (rawCustom && !partner) {
+        const parsed = JSON.parse(rawCustom) as CustomCommand[];
+        if (Array.isArray(parsed)) setCustomCommands(parsed);
       }
-    }
-    const saved = window.localStorage.getItem("sundome:settings");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as {
-          difficulty?: SundomeDifficulty;
-          ending?: SundomeEnding;
-          voice?: boolean;
-          metronome?: boolean;
-          volume?: number;
-        };
+
+      const savedSettings = window.localStorage.getItem(SETTINGS_KEY);
+      if (savedSettings && !partner) {
+        const parsed = JSON.parse(savedSettings) as Partial<{
+          durationMode: number | "custom";
+          customMinutes: string;
+          difficulty: SundomeDifficulty;
+          ending: SundomeEnding;
+          metronome: boolean;
+          voice: boolean;
+          voiceActor: VoiceActorId;
+          volume: number;
+          body: BodyKind;
+          dim: number;
+          fit: "contain" | "cover";
+          pauseVideoOnStop: boolean;
+        }>;
+        if (parsed.durationMode !== undefined) setDurationMode(parsed.durationMode);
+        if (parsed.customMinutes) setCustomMinutes(parsed.customMinutes);
         if (parsed.difficulty) setDifficulty(parsed.difficulty);
         if (parsed.ending) setEnding(parsed.ending);
-        if (typeof parsed.voice === "boolean") setVoice(parsed.voice);
         if (typeof parsed.metronome === "boolean") setMetronome(parsed.metronome);
+        if (typeof parsed.voice === "boolean") setVoice(parsed.voice);
+        if (parsed.voiceActor && ZH_ACTORS.includes(parsed.voiceActor)) {
+          setVoiceActor(parsed.voiceActor);
+        }
         if (typeof parsed.volume === "number") setVolume(parsed.volume);
-      } catch {
-        // Ignore malformed settings.
+        if (parsed.body && !variant) setBody(parsed.body);
+        if (typeof parsed.dim === "number") setVideoDim(parsed.dim);
+        if (parsed.fit === "contain" || parsed.fit === "cover") {
+          setVideoFit(parsed.fit);
+        }
+        if (typeof parsed.pauseVideoOnStop === "boolean") {
+          setPauseVideoOnStop(parsed.pauseVideoOnStop);
+        }
       }
+
+      const savedLim = loadLimits();
+      if (savedLim) setLimits(savedLim);
+      setExtMax(loadExtMax());
+    } catch {
+      // Ignore storage errors
+    } finally {
+      setHydrated(true);
     }
-    setHydrated(true);
-  }, []);
+  }, [partner, variant]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem("sundome:custom", JSON.stringify(customCommands));
-  }, [customCommands, hydrated]);
+    if (!hydrated || partner) return;
+    try {
+      window.localStorage.setItem(CUSTOM_KEY, JSON.stringify(customCommands));
+    } catch {}
+  }, [customCommands, hydrated, partner]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem(
-      "sundome:settings",
-      JSON.stringify({ difficulty, ending, voice, metronome, volume }),
-    );
-  }, [difficulty, ending, voice, metronome, volume, hydrated]);
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current && audioRef.current.state !== "closed") {
-        void audioRef.current.close();
-      }
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
+    if (!hydrated || partner) return;
+    try {
+      window.localStorage.setItem(
+        SETTINGS_KEY,
+        JSON.stringify({
+          durationMode,
+          customMinutes,
+          difficulty,
+          ending,
+          metronome,
+          voice,
+          voiceActor,
+          volume,
+          body,
+          dim: videoDim,
+          fit: videoFit,
+          pauseVideoOnStop,
+        }),
+      );
+    } catch {}
+  }, [
+    body,
+    customMinutes,
+    difficulty,
+    durationMode,
+    ending,
+    hydrated,
+    metronome,
+    partner,
+    pauseVideoOnStop,
+    videoDim,
+    videoFit,
+    voice,
+    voiceActor,
+    volume,
+  ]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.volume = videoVolume;
@@ -223,215 +470,695 @@ export function SundomeGame({
   }, [videoUrl]);
 
   useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid || !videoUrl) return;
+    const isPlayingStage = phase === "playing";
+    if (
+      isPlayingStage &&
+      (pauseVideoOnStop && command.type === "stop")
+    ) {
+      vid.pause();
+    } else if (phase === "paused") {
+      vid.pause();
+    } else if (isPlayingStage) {
+      void vid.play().catch(() => undefined);
+    }
+  }, [command.type, pauseVideoOnStop, phase, videoUrl]);
+
+  useEffect(() => {
     return () => {
       if (videoUrl?.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
     };
   }, [videoUrl]);
 
+  useEffect(() => {
+    if (!seekFlash) return;
+    const id = window.setTimeout(() => setSeekFlash(null), 650);
+    return () => window.clearTimeout(id);
+  }, [seekFlash]);
+
+  useEffect(() => {
+    if (!quitArmed) return;
+    const id = window.setTimeout(() => setQuitArmed(false), 2500);
+    return () => window.clearTimeout(id);
+  }, [quitArmed]);
+
+  useEffect(() => {
+    if (!remoteOverlay) return;
+    const id = window.setTimeout(() => {
+      if (Date.now() >= remoteOverlay.until) setRemoteOverlay(null);
+    }, Math.max(50, remoteOverlay.until - Date.now()));
+    return () => window.clearTimeout(id);
+  }, [remoteOverlay]);
+
+  // Audio helpers
   function ensureAudio() {
-    type AudioWindow = Window & { webkitAudioContext?: typeof AudioContext };
-    const Ctor = window.AudioContext ?? (window as AudioWindow).webkitAudioContext;
-    if (!Ctor) return;
-    if (!audioRef.current || audioRef.current.state === "closed") {
-      audioRef.current = new Ctor();
+    if (typeof window === "undefined") return null;
+    if (!audioCtxRef.current) {
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      if (Ctx) audioCtxRef.current = new Ctx();
     }
-    if (audioRef.current.state === "suspended") {
-      void audioRef.current.resume();
+    if (audioCtxRef.current?.state === "suspended") {
+      void audioCtxRef.current.resume();
     }
+    return audioCtxRef.current;
   }
 
-  function click() {
-    const ctx = audioRef.current;
-    if (!ctx || ctx.state === "closed") return;
-    const oscillator = ctx.createOscillator();
+  function clickTone() {
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = 880;
-    const now = ctx.currentTime;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.02, volume * 0.25), now + 0.005);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
-    oscillator.connect(gain);
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(commandRef.current.type === "slow" ? 420 : 660, ctx.currentTime);
+    gain.gain.setValueAtTime(Math.max(0.02, volumeRef.current * 0.22), ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.055);
+    osc.connect(gain);
     gain.connect(ctx.destination);
-    oscillator.start(now);
-    oscillator.stop(now + 0.08);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.06);
   }
 
-  function speak(text: string) {
-    if (!voiceRef.current || typeof window === "undefined" || !window.speechSynthesis) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = locale === "zh" ? "zh-CN" : "en-US";
-    utterance.rate = 1;
-    utterance.volume = 1;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+  function speakText(text: string) {
+    if (!voiceRef.current || typeof window === "undefined") return;
+    void playVoiceOrSpeech(text, {
+      lang: locale,
+      actor: voiceActorRef.current,
+      volume: volumeRef.current,
+    });
   }
 
-  function poolForType(type: CommandType): SundomeCommand[] {
-    const base = copy.commands[type].map((item) => ({
-      ...item,
-      text: adaptVariantText(item.text, variant, locale),
-    }));
-    const custom = customCommandsRef.current.filter((item) => item.type === type);
-    return [...base, ...custom];
-  }
-
-  function pickCommand(forceRest: boolean): SundomeCommand {
-    let type: CommandType;
-    if (forceRest) {
-      type = "stop";
-    } else if (Math.random() < 0.28) {
-      type = "slow";
-    } else {
-      type = "stroke";
+  const recordTraceSeg = useCallback((mode: SundomeArcMode) => {
+    if (!playStartedAtRef.current) return;
+    const elapsed = Math.max(0, Date.now() - playStartedAtRef.current);
+    const prev = traceRef.current.segs[traceRef.current.segs.length - 1];
+    if (!prev || prev[1] !== mode) {
+      traceRef.current.segs.push([elapsed, mode]);
     }
-    let options = poolForType(type).filter(
-      (item) => item.text !== lastCommandRef.current,
-    );
-    if (!options.length) options = poolForType(type);
-    const chosen = randomOf(options);
-    lastCommandRef.current = chosen.text;
-    return chosen;
+  }, []);
+
+  const finalizeTrace = useCallback(() => {
+    if (playStartedAtRef.current) {
+      traceRef.current.end = Math.max(
+        1000,
+        Date.now() - playStartedAtRef.current,
+      );
+    }
+    setDoneTrace({
+      end: traceRef.current.end,
+      edges: [...traceRef.current.edges],
+      segs: [...traceRef.current.segs],
+    });
+  }, []);
+
+  // Build wire state packet & broadcast helper
+  const buildStatePacket = useCallback(
+    (overridePhase?: "setup" | "play" | "reward" | "done", outcome?: string): RemoteMessage => {
+      const p = phaseRef.current;
+      const wirePhase: "setup" | "play" | "reward" | "done" =
+        overridePhase ??
+        (p === "idle"
+          ? "setup"
+          : p === "playing" || p === "paused"
+            ? "play"
+            : p === "permission"
+              ? "reward"
+              : "done");
+      const curCmd = commandRef.current;
+      const wireOutcome =
+        outcome ??
+        (p === "permission" || p === "finished"
+          ? "success"
+          : p === "denied"
+            ? "fail"
+            : p === "ruined"
+              ? "ruin"
+              : undefined);
+      const wireMode =
+        curCmd.type === "stroke"
+          ? "go"
+          : curCmd.type === "slow"
+            ? "slow"
+            : "stop";
+      const gWire = gripWire(remoteGripRef.current);
+
+      return {
+        t: "state",
+        v: 2,
+        phase: wirePhase,
+        body: bodyRef.current,
+        lang: locale,
+        text: adaptVariantText(curCmd.text, locale, bodyRef.current),
+        mode: wireMode,
+        left: timeLeftRef.current * 1000,
+        total: totalSecondsRef.current * 1000,
+        edges: edgesRef.current,
+        count: cmdCountRef.current,
+        paused: p === "paused",
+        bpm: wireMode === "stop" ? 0 : curCmd.bpm,
+        setBpm:
+          typeof remoteDriveRef.current === "number"
+            ? remoteDriveRef.current
+            : undefined,
+        drive:
+          remoteDriveRef.current === "auto"
+            ? undefined
+            : remoteDriveRef.current,
+        part: remotePartRef.current,
+        grip: gWire.k,
+        ...(gWire.x ? { gx: gWire.x } : {}),
+        lim: limitsRef.current,
+        wish: wishes,
+        xm: extMaxRef.current,
+        xu: extUsedRef.current,
+        level: arousalRef.current || undefined,
+        at: nextCmdAtRef.current || undefined,
+        ...(wireOutcome ? { outcome: wireOutcome } : {}),
+      };
+    },
+    [locale, wishes],
+  );
+
+  const sendStateNow = useCallback(
+    (overridePhase?: "setup" | "play" | "reward" | "done", outcome?: string) => {
+      const link = remoteLinkRef.current;
+      if (!link) return;
+      link.send(buildStatePacket(overridePhase, outcome));
+    },
+    [buildStatePacket],
+  );
+
+  // Connect WebSocket RemoteLink helper
+  const connectRemoteLink = useCallback(
+    (creds: { room: string; key: string; open: boolean }) => {
+      remoteLinkRef.current?.stop();
+      setRemoteStatus("connecting");
+      setPeerOnline(false);
+
+      const limEncoded = encodeURIComponent(JSON.stringify(limitsRef.current));
+      const wishEncoded = encodeURIComponent(wishes.join(","));
+      const extra =
+        (creds.open
+          ? `&list=1&lang=${encodeURIComponent(locale)}&body=${encodeURIComponent(bodyRef.current)}&hb=1`
+          : "&list=0") +
+        `&mins=${effectiveMinutes}&diff=${mapDifficultyForWire(difficultyRef.current)}&xm=${extMaxRef.current}&lim=${limEncoded}&wish=${wishEncoded}`;
+
+      const link = new RemoteLink(
+        creds.room,
+        "player",
+        creds.key,
+        (msg) => {
+          if (msg.t === "hello") {
+            setPeerOnline(msg.peer);
+            sendStateNow();
+            return;
+          }
+          if (msg.t === "peer") {
+            setPeerOnline(msg.online);
+            if (msg.online) {
+              sendStateNow();
+            } else {
+              setAutoCountdown(null);
+            }
+            return;
+          }
+          if (msg.t === "watch") {
+            setWatchCount(msg.n);
+            setQueueCount(msg.of);
+            return;
+          }
+          if (msg.t === "thx") {
+            setThxGot(msg.k);
+            return;
+          }
+          if (msg.t === "drive") {
+            if (phaseRef.current !== "playing" && phaseRef.current !== "paused") return;
+            if (msg.k === "auto") {
+              setRemoteDrive("auto");
+              remoteDriveRef.current = "auto";
+              sendStateNow();
+              return;
+            }
+            if (msg.k === "stop") {
+              setRemoteDrive("stop");
+              remoteDriveRef.current = "stop";
+              const stopPool = copy.commands.stop;
+              const next = randomOf(stopPool);
+              setCommand(next);
+              setCmdCount((c) => c + 1);
+              recordTraceSeg("stop");
+              speakText(adaptVariantText(next.text, locale, bodyRef.current));
+              sendStateNow();
+              return;
+            }
+            const bpm = capBpm(Number(msg.k), limitsRef.current);
+            setRemoteDrive(bpm);
+            remoteDriveRef.current = bpm;
+            const t: CommandType = bpm <= 70 ? "slow" : "stroke";
+            const pool = copy.commands[t];
+            const picked = randomOf(pool);
+            const nextCmd: SundomeCommand = { ...picked, type: t, bpm };
+            setCommand(nextCmd);
+            setCmdCount((c) => c + 1);
+            recordTraceSeg(toArcMode(t));
+            speakText(adaptVariantText(nextCmd.text, locale, bodyRef.current));
+            sendStateNow();
+            return;
+          }
+          if (msg.t === "cmd") {
+            if (phaseRef.current !== "playing" && phaseRef.current !== "paused") return;
+            const t: CommandType =
+              msg.k === "stop" ? "stop" : msg.k === "slow" ? "slow" : "stroke";
+            const pool = copy.commands[t];
+            const base = randomOf(pool);
+            const bpm =
+              msg.k === "fast"
+                ? capBpm(140, limitsRef.current)
+                : msg.k === "slow"
+                  ? capBpm(60, limitsRef.current)
+                  : msg.k === "stop"
+                    ? 0
+                    : capBpm(100, limitsRef.current);
+            const nextCmd: SundomeCommand = { ...base, type: t, bpm };
+            setCommand(nextCmd);
+            setCmdCount((c) => c + 1);
+            recordTraceSeg(toArcMode(t));
+            speakText(adaptVariantText(nextCmd.text, locale, bodyRef.current));
+            sendStateNow();
+            return;
+          }
+          if (msg.t === "part") {
+            const p = msg.k === "none" ? undefined : msg.k;
+            setRemotePart(p);
+            remotePartRef.current = p;
+            sendStateNow();
+            return;
+          }
+          if (msg.t === "grip") {
+            const g5 = msg.k === "none" ? "normal" : grip5Of(msg.k, msg.x);
+            if (gripAllowed(g5, limitsRef.current)) {
+              setRemoteGrip(g5);
+              remoteGripRef.current = g5;
+              sendStateNow();
+            }
+            return;
+          }
+          if (msg.t === "verdict") {
+            setRemoteVerdict(msg.k);
+            remoteVerdictRef.current = msg.k;
+            return;
+          }
+          if (msg.t === "now") {
+            if (limitsRef.current.nn) return;
+            if (phaseRef.current === "playing" || phaseRef.current === "paused") {
+              finalizeTrace();
+              setPhase("permission");
+              phaseRef.current = "permission";
+              speakText(copy.status.permission);
+              sendStateNow("reward", "success");
+            }
+            return;
+          }
+          if (msg.t === "line") {
+            const lineRaw = rV2.lines[msg.k];
+            if (lineRaw) {
+              const txt = plainLine(lineRaw);
+              setRemoteOverlay({ text: txt, until: Date.now() + 8000 });
+              speakText(txt);
+            }
+            return;
+          }
+          if (msg.t === "say") {
+            const txt = msg.text.slice(0, REMOTE_CONSTANTS.REMOTE_SAY_MAX);
+            if (txt) {
+              setRemoteOverlay({ text: txt, until: Date.now() + 8000 });
+              speakText(txt);
+            }
+            return;
+          }
+          if (msg.t === "penalty") {
+            if (msg.k === "extend") {
+              const max = extMaxRef.current;
+              const used = extUsedRef.current;
+              if (max >= 0 && used >= max) return;
+              setExtUsed((u) => u + 1);
+              extUsedRef.current += 1;
+              setExtendRound((r) => r + 1);
+              setTimeLeft((t) => t + 120);
+              setTotalSeconds((t) => t + 120);
+              timeLeftRef.current += 120;
+              totalSecondsRef.current += 120;
+              setRemoteOverlay({ text: rText.extended, until: Date.now() + 5000 });
+              speakText(rText.extended);
+              sendStateNow();
+            } else if (msg.k === "restart") {
+              const sec = effectiveMinutes * 60;
+              setTimeLeft(sec);
+              setTotalSeconds(sec);
+              timeLeftRef.current = sec;
+              totalSecondsRef.current = sec;
+              setEdges(0);
+              setRemoteOverlay({ text: rText.restarted, until: Date.now() + 5000 });
+              speakText(rText.restarted);
+              sendStateNow();
+            }
+            return;
+          }
+        },
+        (st) => {
+          setRemoteStatus(st);
+          if (st === "ended") {
+            setPeerOnline(false);
+          }
+        },
+      );
+
+      link.hereInfo = () => ({
+        ph:
+          phaseRef.current === "playing" || phaseRef.current === "paused"
+            ? "play"
+            : "setup",
+        left:
+          phaseRef.current === "playing" || phaseRef.current === "paused"
+            ? timeLeftRef.current
+            : undefined,
+      });
+
+      remoteLinkRef.current = link;
+      link.start();
+    },
+    [
+      copy.commands,
+      copy.status.permission,
+      effectiveMinutes,
+      finalizeTrace,
+      locale,
+      rText.extended,
+      rText.restarted,
+      rV2.lines,
+      recordTraceSeg,
+      sendStateNow,
+      wishes,
+    ],
+  );
+
+  // Connect immediately if remoteInvite prop is passed
+  useEffect(() => {
+    if (!remoteInvite) return;
+    connectRemoteLink({
+      room: remoteInvite.room,
+      key: remoteInvite.key,
+      open: false,
+    });
+    return () => {
+      remoteLinkRef.current?.stop();
+    };
+  }, [connectRemoteLink, remoteInvite]);
+
+  // Clean up WS on unmount
+  useEffect(() => {
+    return () => {
+      remoteLinkRef.current?.stop();
+    };
+  }, []);
+
+  // Re-notify server if open-room config changes while in setup
+  useEffect(() => {
+    if (!roomCreds?.open || phase !== "idle") return;
+    const limEncoded = encodeURIComponent(JSON.stringify(limits));
+    const wishEncoded = encodeURIComponent(wishes.join(","));
+    const nextExtra = `&list=1&lang=${encodeURIComponent(locale)}&body=${encodeURIComponent(body)}&hb=1&mins=${effectiveMinutes}&diff=${mapDifficultyForWire(difficulty)}&xm=${extMax}&lim=${limEncoded}&wish=${wishEncoded}`;
+    remoteLinkRef.current?.relist(nextExtra);
+  }, [body, difficulty, effectiveMinutes, extMax, limits, locale, phase, roomCreds?.open, wishes]);
+
+  // 5-second auto-start countdown when peer connects to waiting screen
+  useEffect(() => {
+    if (!peerOnline || phase !== "idle" || (!roomCreds && !remoteInvite)) {
+      setAutoCountdown(null);
+      return;
+    }
+    setAutoCountdown(5);
+    const id = window.setInterval(() => {
+      setAutoCountdown((c) => {
+        if (c === null) return null;
+        if (c <= 1) {
+          window.clearInterval(id);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [peerOnline, phase, remoteInvite, roomCreds]);
+
+  // Trigger auto-start when autoCountdown reaches 0
+  useEffect(() => {
+    if (autoCountdown === 0 && phase === "idle") {
+      beginGame();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCountdown]);
+
+  // Command selection helpers
+  function poolForType(type: CommandType): SundomeCommand[] {
+    const customMatching = customRef.current.filter((c) => c.type === type);
+    return customMatching.length ? [...copy.commands[type], ...customMatching] : copy.commands[type];
+  }
+
+  function pickCommand(forceRest: boolean, rng: () => number = Math.random): SundomeCommand {
+    const current = commandRef.current;
+    let targetType: CommandType;
+    if (forceRest || current.type === "stop") {
+      targetType = rng() < 0.72 ? "stroke" : "slow";
+    } else if (rng() < diffInfo.restEvery * 0.14) {
+      targetType = "stop";
+    } else if (rng() < 0.34) {
+      targetType = "slow";
+    } else {
+      targetType = "stroke";
+    }
+    const pool = poolForType(targetType);
+    const picked = randomOf(pool, rng);
+    return {
+      ...picked,
+      bpm: targetType === "stop" ? 0 : capBpm(picked.bpm, limitsRef.current),
+    };
   }
 
   function nextCommand(forceRest = false) {
-    commandIndexRef.current += 1;
-    const restEvery = copy.difficulties[difficultyRef.current].restEvery;
-    const isRest = forceRest || commandIndexRef.current % restEvery === 0;
-    const command = pickCommand(isRest);
-    const duration =
-      command.type === "stop"
-        ? 18 + Math.floor(Math.random() * 8)
-        : 28 + Math.floor(Math.random() * 14);
-    commandRemainingRef.current = duration;
-    setCommandRemaining(duration);
-    setCurrent(command);
-    speak(command.text);
-  }
-
-  function grantPermission() {
-    setPhase("permission");
-    setPermissionLeft(10);
-    const rawLine =
-      locale === "zh" ? "可以射了。你有十秒。" : "You may come. You have ten seconds.";
-    speak(adaptVariantText(rawLine, variant, locale));
+    if (remoteDriveRef.current !== "auto") {
+      return;
+    }
+    const next = pickCommand(forceRest);
+    setCommand(next);
+    commandRef.current = next;
+    setCmdCount((c) => c + 1);
+    cmdCountRef.current += 1;
+    recordTraceSeg(toArcMode(next.type));
+    speakText(adaptVariantText(next.text, locale, bodyRef.current));
+    sendStateNow();
   }
 
   function resolveEnd() {
-    const config = copy.difficulties[difficultyRef.current];
-    const chance = Math.min(100, config.chance + edgeBonusRef.current);
-    const roll = Math.random() * 100;
-    const currentEnding = endingRef.current;
+    const end = endingRef.current;
+    const d = difficultyRef.current;
+    const verdict = remoteVerdictRef.current;
 
-    if (currentEnding === "allowed") {
-      grantPermission();
+    if (verdict === "allow") {
+      finalizeTrace();
+      setPhase("permission");
+      speakText(copy.status.permission);
+      sendStateNow("done", "success");
       return;
     }
-    if (currentEnding === "denied") {
+    if (verdict === "deny") {
+      finalizeTrace();
       setPhase("denied");
-      return;
-    }
-    if (currentEnding === "ruined") {
-      setPhase("ruined");
-      setPermissionLeft(10);
-      return;
-    }
-    if (currentEnding === "overtime") {
-      if (roll < chance) {
-        grantPermission();
-      } else {
-        remainingRef.current = 120;
-        totalRef.current = 120;
-        setRemaining(120);
-        setOvertimeNotice(true);
-        window.setTimeout(() => setOvertimeNotice(false), 4000);
-      }
+      speakText(copy.status.denied);
+      sendStateNow("done", "fail");
       return;
     }
 
-    if (roll < chance) grantPermission();
-    else setPhase("denied");
+    if (end === "allowed") {
+      finalizeTrace();
+      setPhase("permission");
+      speakText(copy.status.permission);
+      sendStateNow("done", "success");
+      return;
+    }
+    if (end === "denied") {
+      finalizeTrace();
+      setPhase("denied");
+      speakText(copy.status.denied);
+      sendStateNow("done", "fail");
+      return;
+    }
+    if (end === "ruined") {
+      finalizeTrace();
+      setPhase("ruined");
+      speakText(copy.status.ruined);
+      sendStateNow("done", "ruin");
+      return;
+    }
+    if (end === "overtime") {
+      const extraSec = 60 + Math.floor(Math.random() * 61);
+      setTimeLeft(extraSec);
+      setPhase("overtime");
+      const goCmd = randomOf(poolForType("stroke"));
+      setCommand(goCmd);
+      speakText(`${copy.status.overtime}. ${adaptVariantText(goCmd.text, locale, bodyRef.current)}`);
+      return;
+    }
+
+    // Lottery roll
+    const roll = Math.floor(Math.random() * 100);
+    setActiveRoll(roll);
+    const baseChance = copy.difficulties[d].chance;
+    if (roll < baseChance) {
+      finalizeTrace();
+      setPhase("permission");
+      speakText(copy.status.permission);
+      sendStateNow("done", "success");
+    } else {
+      finalizeTrace();
+      setPhase("denied");
+      speakText(copy.status.denied);
+      sendStateNow("done", "fail");
+    }
   }
 
+  // Metronome scheduler while playing
   useEffect(() => {
-    if (phase !== "playing") return;
-    const timer = window.setInterval(() => {
-      remainingRef.current -= 1;
-      commandRemainingRef.current -= 1;
-
-      if (remainingRef.current <= 0) {
-        remainingRef.current = 0;
-        setRemaining(0);
-        resolveEnd();
-        return;
-      }
-
-      if (commandRemainingRef.current <= 0) {
-        nextCommand();
-      }
-
-      setRemaining(remainingRef.current);
-      setCommandRemaining(Math.max(0, commandRemainingRef.current));
-    }, 1000);
-    return () => window.clearInterval(timer);
-    // The interval is tied to the playing phase; settings are locked while playing.
+    if (phase !== "playing" && phase !== "overtime") return;
+    if (!metronome || command.type === "stop" || command.bpm <= 0) return;
+    const intervalMs = Math.max(160, Math.round(60000 / command.bpm));
+    clickTone();
+    const id = window.setInterval(() => clickTone(), intervalMs);
+    return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, command, metronome]);
 
+  // Partner deterministic sync timer
   useEffect(() => {
-    if (phase !== "permission" && phase !== "ruined") return;
+    if (!partner) return;
+    const id = window.setInterval(() => {
+      setPartnerClock(Date.now());
+      const ph = partnerPhase(partner.startAt, partner.s.duration);
+      if (ph.phase === "during" && phaseRef.current === "idle") {
+        // Auto-start partner play at exact sync time
+        const sec = Math.max(1, Math.round((partner.s.duration * 60000 - ph.elapsedMs) / 1000));
+        beginGame(sec);
+      }
+      if (ph.phase === "during" && phaseRef.current === "playing") {
+        const stepMs = 15000;
+        const stepIdx = Math.floor(ph.elapsedMs / stepMs);
+        if (stepIdx !== partnerStepIdxRef.current) {
+          partnerStepIdxRef.current = stepIdx;
+          const rng = mulberry32((partner.seed ^ Math.imul(stepIdx + 1, 0x9e3779b1)) >>> 0);
+          const cmd = pickCommand(false, rng);
+          setCommand(cmd);
+          commandRef.current = cmd;
+          setCmdCount(stepIdx + 1);
+          recordTraceSeg(toArcMode(cmd.type));
+          speakText(adaptVariantText(cmd.text, locale, bodyRef.current));
+        }
+      }
+    }, 500);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partner]);
+
+  // Main countdown + remote state heartbeat
+  useEffect(() => {
+    if (phase !== "playing" && phase !== "overtime") return;
+
+    let cmdSwitchCountdown = partner ? 9999 : 8 + Math.floor(Math.random() * 8);
+    nextCmdAtRef.current = partner ? 0 : Date.now() + cmdSwitchCountdown * 1000;
+
     const timer = window.setInterval(() => {
-      setPermissionLeft((value) => {
-        if (value <= 1) {
-          window.clearInterval(timer);
-          setPhase("finished");
+      if (edgeCooldown > 0) setEdgeCooldown((v) => Math.max(0, v - 1));
+
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          if (phaseRef.current === "overtime") {
+            finalizeTrace();
+            setPhase("finished");
+            speakText(copy.status.finished);
+            sendStateNow("done", "success");
+          } else {
+            resolveEnd();
+          }
           return 0;
         }
-        return value - 1;
+        return prev - 1;
       });
+
+      if (!partner && remoteDriveRef.current === "auto") {
+        cmdSwitchCountdown -= 1;
+        if (cmdSwitchCountdown <= 0) {
+          cmdSwitchCountdown = 7 + Math.floor(Math.random() * 9);
+          nextCmdAtRef.current = Date.now() + cmdSwitchCountdown * 1000;
+          nextCommand();
+        }
+      }
+
+      sendStateNow();
     }, 1000);
+
     return () => window.clearInterval(timer);
-  }, [phase]);
-
-  useEffect(() => {
-    if (metronome !== true || phase !== "playing" || !current) return;
-    if (current.type === "stop") return;
-    const interval = 60_000 / current.bpm;
-    let cancelled = false;
-    let timer = 0;
-    function tick() {
-      if (cancelled) return;
-      click();
-      timer = window.setTimeout(tick, interval);
-    }
-    tick();
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metronome, phase, current, volume]);
+  }, [phase, partner]);
 
-  function beginGame() {
+  // Idle setup/paused remote state heartbeat
+  useEffect(() => {
+    if (!isRemote) return;
+    if (phase === "playing" || phase === "overtime") return;
+    const id = window.setInterval(() => {
+      sendStateNow();
+    }, 2000);
+    return () => window.clearInterval(id);
+  }, [isRemote, phase, sendStateNow]);
+
+  function beginGame(overrideSeconds?: number) {
     ensureAudio();
-    const minutes =
-      durationMode === "custom"
-        ? Math.min(180, Math.max(1, Number(customMinutes) || 10))
-        : durationMode;
-    const total = Math.round(minutes * 60);
-    totalRef.current = total;
-    remainingRef.current = total;
-    commandRemainingRef.current = 0;
-    commandIndexRef.current = 0;
-    lastCommandRef.current = null;
-    edgeBonusRef.current = 0;
-    edgesRef.current = 0;
+    const total = overrideSeconds ?? effectiveMinutes * 60;
+    const first = partner
+      ? pickCommand(false, mulberry32(partner.seed))
+      : randomOf(poolForType("stroke"));
+
+    setTotalSeconds(total);
+    totalSecondsRef.current = total;
+    setTimeLeft(total);
+    timeLeftRef.current = total;
     setEdges(0);
-    setEdgeBonus(0);
-    setRemaining(total);
-    setOvertimeNotice(false);
+    edgesRef.current = 0;
+    setCmdCount(1);
+    cmdCountRef.current = 1;
+    setEdgeCooldown(0);
+    setActiveRoll(null);
+    setExtendRound(0);
+    setExtUsed(0);
+    setRemoteVerdict(null);
+    setThxSent(null);
+    setThxGot(null);
+    setRemoteDrive("auto");
+    setCommand(first);
+    commandRef.current = first;
+
+    playStartedAtRef.current = Date.now();
+    traceRef.current = {
+      edges: [],
+      segs: [[0, toArcMode(first.type)]],
+    };
+    setDoneTrace(null);
+
     setPhase("playing");
-    nextCommand(false);
+    phaseRef.current = "playing";
+    speakText(adaptVariantText(first.text, locale, body));
+    sendStateNow("play");
   }
 
   function startGame() {
@@ -443,108 +1170,137 @@ export function SundomeGame({
   }
 
   function quitGame() {
-    setPhase("idle");
-    setCurrent(null);
-    setRemaining(0);
-    setCommandRemaining(0);
-    setEdges(0);
-    setEdgeBonus(0);
-    edgeBonusRef.current = 0;
-    edgesRef.current = 0;
-    setOvertimeNotice(false);
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+    stopVoiceFiles();
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {}
+    if (
+      phaseRef.current === "playing" ||
+      phaseRef.current === "overtime" ||
+      phaseRef.current === "paused"
+    ) {
+      finalizeTrace();
     }
+    setPhase("idle");
+    phaseRef.current = "idle";
+    sendStateNow("setup");
   }
 
   function togglePause() {
-    setPhase((value) => {
-      if (value === "playing") return "paused";
-      if (value === "paused") return "playing";
-      return value;
+    setPhase((prev) => {
+      const next = prev === "paused" ? "playing" : "paused";
+      phaseRef.current = next;
+      sendStateNow("play");
+      return next;
     });
   }
 
   function handleEdge() {
-    if (phase !== "playing" || !current || current.type === "stop") return;
+    if (edgeCooldown > 0) return;
+    setEdges((v) => v + 1);
     edgesRef.current += 1;
-    edgeBonusRef.current = Math.min(20, edgeBonusRef.current + 5);
-    setEdges(edgesRef.current);
-    setEdgeBonus(edgeBonusRef.current);
-    const cooldown: SundomeCommand = {
-      text: copy.status.edgeCooldown,
-      type: "stop",
-      bpm: 40,
-    };
-    lastCommandRef.current = cooldown.text;
-    commandRemainingRef.current = 20;
-    setCommandRemaining(20);
-    setCurrent(cooldown);
-    speak(cooldown.text);
-  }
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      if (event.code === "Space") {
-        event.preventDefault();
-        if (phase === "playing" || phase === "paused") togglePause();
-      }
-      if (event.key === "e" || event.key === "E") {
-        handleEdge();
-      }
-      if (event.key === "Escape") {
-        if (phase !== "idle") quitGame();
-      }
+    setEdgeCooldown(5);
+    if (playStartedAtRef.current) {
+      traceRef.current.edges.push(Date.now() - playStartedAtRef.current);
     }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  });
-
-  async function fetchSampleSource(source: SampleSource): Promise<SampleItem[]> {
-    if (IS_STATIC_EXPORT) return [];
-    const response = await fetch(`/api/sundome-lab/${source}`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = (await response.json()) as { items?: SampleItem[] };
-    return Array.isArray(data.items)
-      ? data.items.filter((item) => item && item.mp4)
-      : [];
+    const stopCmd = randomOf(poolForType("stop"));
+    setCommand(stopCmd);
+    commandRef.current = stopCmd;
+    setCmdCount((c) => c + 1);
+    recordTraceSeg("stop");
+    remoteLinkRef.current?.send({ t: "signal", k: "limit" });
+    speakText(adaptVariantText(stopCmd.text, locale, body));
+    sendStateNow();
   }
 
-  async function loadSamples(source: SampleSource, allowFallback = false) {
-    if (IS_STATIC_EXPORT) return;
-    setSampleSource(source);
-    setSamplePage(0);
+  function handleLostOrCame() {
+    finalizeTrace();
+    remoteLinkRef.current?.send({ t: "signal", k: "came" });
+    setPhase("denied");
+    phaseRef.current = "denied";
+    sendStateNow("done", "lost");
+  }
+
+  // Create remote room (`3/4` -> `4/4`)
+  async function handleCreateRemoteRoom() {
+    if (makingRoom) return;
+    setMakingRoom(true);
+    setMakeRoomError(false);
+    try {
+      const open = remoteOnly === "open";
+      const creds = await createRemoteRoom(open);
+      setRoomCreds(creds);
+      setWaitingSince(Date.now());
+      connectRemoteLink({
+        room: creds.room,
+        key: creds.player,
+        open: creds.open,
+      });
+    } catch {
+      setMakeRoomError(true);
+    } finally {
+      setMakingRoom(false);
+    }
+  }
+
+  function handleCancelRemoteRoom() {
+    remoteLinkRef.current?.end();
+    remoteLinkRef.current = null;
+    setRoomCreds(null);
+    setPeerOnline(false);
+    setWaitingSince(null);
+    setAutoCountdown(null);
+  }
+
+  // Video samples & browse loader
+  async function fetchSampleSource(
+    src: SampleSource,
+    opts?: { q?: string; g?: string; p?: number },
+  ): Promise<{ items: SampleItem[]; totalPages?: number }> {
+    const endpoint =
+      src === "browse"
+        ? `/api/sundome-lab/browse?g=${encodeURIComponent(opts?.g ?? "")}&sort=popular&q=${encodeURIComponent(opts?.q ?? "")}&p=${opts?.p ?? 1}`
+        : `/api/sundome-lab/${src}`;
+    const res = await fetch(endpoint, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as {
+      items?: SampleItem[];
+      totalPages?: number;
+    };
+    return {
+      items: Array.isArray(data.items) ? data.items : [],
+      totalPages: data.totalPages,
+    };
+  }
+
+  async function loadSamples(
+    src: SampleSource,
+    allowFallback = false,
+    opts?: { q?: string; g?: string; p?: number },
+  ) {
     setSamplesLoading(true);
     setSamplesError(false);
     try {
-      const items = await fetchSampleSource(source);
-      if (items.length === 0 && allowFallback && source === "samples") {
+      const res = await fetchSampleSource(src, opts);
+      if (!res.items.length && allowFallback && src === "samples") {
         setSampleSource("alt-samples");
-        const fallbackItems = await fetchSampleSource("alt-samples");
-        setSamples(fallbackItems);
+        const fb = await fetchSampleSource("alt-samples");
+        setSamples(fb.items);
+        setSamplePage(0);
       } else {
-        setSamples(items);
+        setSamples(res.items);
+        if (typeof res.totalPages === "number") setBrowseTotalPages(res.totalPages);
+        setSamplePage(0);
       }
     } catch {
-      if (allowFallback && source === "samples") {
+      if (allowFallback && src === "samples") {
         try {
           setSampleSource("alt-samples");
-          const fallbackItems = await fetchSampleSource("alt-samples");
-          setSamples(fallbackItems);
+          const fb = await fetchSampleSource("alt-samples");
+          setSamples(fb.items);
+          setSamplePage(0);
           return;
-        } catch {
-          // Fall through to error state.
-        }
+        } catch {}
       }
       setSamplesError(true);
     } finally {
@@ -553,656 +1309,451 @@ export function SundomeGame({
   }
 
   async function openSamples() {
-    if (IS_STATIC_EXPORT) return;
-    if (!accepted) {
-      setGateOpen(true);
-      return;
+    setSamplesOpen((prev) => !prev);
+    if (!samplesOpen && !samples.length && !samplesLoading) {
+      await loadSamples(sampleSource, true);
     }
-    if (samplesOpen) {
-      setSamplesOpen(false);
-      return;
-    }
-    setSamplesOpen(true);
-    if (samples.length || samplesLoading) return;
-    await loadSamples(sampleSource, true);
   }
 
-  const filteredSamples = samples.filter((item) => {
-    if (!sampleQuery.trim()) return true;
-    const haystack = `${item.title} ${item.actress ?? ""}`.toLowerCase();
-    return haystack.includes(sampleQuery.trim().toLowerCase());
-  });
-  const samplePageCount = Math.max(
-    1,
-    Math.ceil(filteredSamples.length / SAMPLE_PAGE_SIZE),
-  );
+  const filteredSamples = useMemo(() => {
+    if (sampleSource === "browse") return samples;
+    const q = sampleSearch.trim().toLowerCase();
+    if (!q) return samples;
+    return samples.filter((item) => item.title.toLowerCase().includes(q));
+  }, [sampleSearch, sampleSource, samples]);
+
+  const samplePageCount = Math.max(1, Math.ceil(filteredSamples.length / 8));
   const safeSamplePage = Math.min(samplePage, samplePageCount - 1);
-  const visibleSamples = filteredSamples.slice(
-    safeSamplePage * SAMPLE_PAGE_SIZE,
-    safeSamplePage * SAMPLE_PAGE_SIZE + SAMPLE_PAGE_SIZE,
+  const pageSamples = filteredSamples.slice(
+    safeSamplePage * 8,
+    safeSamplePage * 8 + 8,
   );
 
-  const difficultyConfig = copy.difficulties[difficulty];
-  const chance = Math.min(100, difficultyConfig.chance + edgeBonus);
-  const progress = totalRef.current
-    ? Math.min(100, (remaining / totalRef.current) * 100)
-    : 0;
+  // Double-tap seek on play stage
+  const handleStageTap = (side: "left" | "right") => {
+    const vid = videoRef.current;
+    if (!vid || !videoUrl) return;
+    const now = Date.now();
+    const ref = side === "left" ? lastTapLeftRef : lastTapRightRef;
+    if (now - ref.current < 320) {
+      const delta = side === "left" ? -10 : 10;
+      vid.currentTime = Math.max(0, vid.currentTime + delta);
+      setSeekFlash(side === "left" ? "-10s" : "+10s");
+      ref.current = 0;
+    } else {
+      ref.current = now;
+    }
+  };
 
-  const colorClass =
-    current?.type === "stop"
-      ? "from-[#ff4d6d]/30 to-[#ff4d6d]/5 border-[#ff4d6d]/50"
-      : current?.type === "slow"
-        ? "from-[#e6b061]/25 to-[#e6b061]/5 border-[#e6b061]/40"
-        : "from-[#6ee7a8]/25 to-[#6ee7a8]/5 border-[#6ee7a8]/40";
+  // Reaction bar helpers (.rr)
+  const favReacts = reactFavsOf(reactPrefs, body);
+  const baseCats = reactCatsOf(body).map((keys, idx) => ({
+    k: String(idx),
+    label: rV2.reactCats[idx] ?? String(idx),
+    keys,
+  }));
+  const reactTabs = [
+    ...(favReacts.length
+      ? [{ k: "fav", label: rCtl.fav, keys: favReacts }]
+      : []),
+    ...baseCats,
+  ];
+  const safeReactCat = Math.min(reactCatIdx, reactTabs.length - 1);
+  const isFemaleBody = body === "female" || body === "lesbian";
+  const allBodySpots: BodyPart[] = isFemaleBody
+    ? ["clit", "inside", "nipple"]
+    : ["shaft", "glans", "balls", "nipple"];
+  const activeParts = allowedParts(allBodySpots, limits);
 
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="card rounded-2xl p-4 sm:p-6" data-sundome-app>
-          {phase === "idle" ? (
-            <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
-              <p className="font-display text-3xl text-foreground">
-                {copy.status.ready}
-              </p>
-              <p className="mt-2 max-w-sm text-sm text-muted-strong">
-                {copy.status.readyHint}
-              </p>
-              <button
-                type="button"
-                onClick={startGame}
-                className="mt-5 cursor-pointer rounded-2xl bg-accent px-8 py-4 text-base font-bold text-white"
-              >
-                {accepted ? copy.actions.start : copy.gate.confirm}
-              </button>
-              <p className="mt-3 text-[11px] text-muted">{copy.gate.body}</p>
-            </div>
-          ) : phase === "permission" ||
-            phase === "denied" ||
-            phase === "ruined" ||
-            phase === "finished" ? (
-            <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
-              <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-muted">
-                {adaptVariantText(
-                  phase === "permission"
-                    ? copy.status.permission
-                    : phase === "denied"
-                      ? copy.status.denied
-                      : phase === "ruined"
-                        ? copy.status.ruined
-                        : copy.status.finished,
-                  variant,
-                  locale,
-                )}
-              </p>
-              <p className="mt-2 font-display text-4xl text-accent">
-                {phase === "permission"
-                  ? `${permissionLeft}s`
-                  : phase === "denied"
-                    ? "✕"
-                    : phase === "ruined"
-                      ? `${permissionLeft}s`
-                      : "✓"}
-              </p>
-              <p className="mt-2 max-w-sm text-sm text-muted-strong">
-                {phase === "permission"
-                  ? copy.status.permissionHint
-                  : phase === "denied"
-                    ? copy.status.deniedHint
-                    : phase === "ruined"
-                      ? copy.status.ruinedHint
-                      : copy.status.readyHint}
-              </p>
-              <div className="mt-5 flex gap-2">
-                <button
-                  type="button"
-                  onClick={startGame}
-                  className="cursor-pointer rounded-2xl bg-accent px-5 py-3 text-sm font-bold text-white"
-                >
-                  {copy.status.playAgain}
-                </button>
-                <button
-                  type="button"
-                  onClick={quitGame}
-                  className="cursor-pointer rounded-2xl border border-card-border px-5 py-3 text-sm font-bold text-muted-strong"
-                >
-                  {copy.actions.quit}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between text-xs text-muted">
-                <span>
-                  {copy.status.timeLeft}:{" "}
-                  <span className="font-bold text-foreground">
-                    {formatTime(remaining)}
-                  </span>
-                </span>
-                <span>
-                  {copy.status.edges}:{" "}
-                  <span className="font-bold text-foreground">{edges}</span>
-                </span>
-                <span>
-                  {copy.status.chance}:{" "}
-                  <span className="font-bold text-accent">{chance}%</span>
-                </span>
-              </div>
+  // Controller share URL using publicOrigin
+  const shareOrigin =
+    publicOrigin || (typeof window !== "undefined" ? window.location.origin : "");
+  const remoteControlLink = roomCreds
+    ? controllerHref(shareOrigin, locale, roomCreds)
+    : "";
 
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-category-bg">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#f5a3c8] to-[#b8a4ff]"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+  // Partner link builder
+  const handleCreatePartnerLink = () => {
+    const startAt = Date.now() + PARTNER_LEAD_MS;
+    const seed = newSeed();
+    const encoded = encodePartner({
+      app: PARTNER_APP,
+      v: PARTNER_VERSION,
+      seed,
+      startAt,
+      s: {
+        duration: effectiveMinutes,
+        difficulty,
+        ending,
+        ...(customCommands.length ? { custom: customCommands.slice(0, 8) } : {}),
+      },
+    });
+    const url = partnerShareUrl(shareOrigin, locale, variant, startAt, encoded);
+    setPartnerStartAt(startAt);
+    setPartnerUrl(url);
+  };
 
-              <div
-                className={`mt-4 rounded-3xl border bg-gradient-to-b p-6 text-center transition-colors ${colorClass}`}
-              >
-                <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-muted-strong">
-                  {current ? copy.types[current.type] : copy.status.ready}
-                </p>
-                <p className="mt-3 min-h-[72px] text-xl font-bold leading-snug text-foreground sm:text-2xl">
-                  {current?.text ?? copy.status.readyHint}
-                </p>
-                {current && current.type !== "stop" ? (
-                  <span
-                    className="beat mx-auto mt-4 block h-3 w-3 rounded-full bg-accent"
-                    style={{ animationDuration: `${60 / current.bpm}s` }}
-                  />
-                ) : (
-                  <span className="mx-auto mt-4 block h-3 w-3 rounded-full bg-[#ff4d6d]" />
-                )}
-                <p className="mt-2 text-[11px] text-muted">
-                  {current?.type === "stop"
-                    ? copy.types.stop
-                    : `${current?.bpm ?? 0} BPM · ${formatTime(commandRemaining)}`}
-                </p>
-              </div>
-
-              {overtimeNotice ? (
-                <p className="mt-2 rounded-xl bg-accent-soft px-3 py-2 text-center text-xs font-bold text-accent">
-                  {copy.status.overtimeHint}
-                </p>
-              ) : null}
-
-              {phase === "paused" ? (
-                <p className="mt-2 rounded-xl bg-category-bg px-3 py-2 text-center text-xs font-bold text-muted-strong">
-                  {copy.status.paused}
-                </p>
-              ) : null}
-
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={handleEdge}
-                  disabled={current?.type === "stop" || phase !== "playing"}
-                  className="cursor-pointer rounded-2xl bg-accent px-3 py-3 text-sm font-bold text-white disabled:cursor-default disabled:opacity-50"
-                >
-                  {copy.actions.edged}
-                </button>
-                <button
-                  type="button"
-                  onClick={togglePause}
-                  className="cursor-pointer rounded-2xl border border-card-border px-3 py-3 text-sm font-bold text-foreground"
-                >
-                  {phase === "paused" ? copy.actions.resume : copy.actions.pause}
-                </button>
-                <button
-                  type="button"
-                  onClick={quitGame}
-                  className="cursor-pointer rounded-2xl border border-card-border px-3 py-3 text-sm font-bold text-muted-strong"
-                >
-                  {copy.actions.quit}
-                </button>
-              </div>
-              <p className="mt-2 text-center text-[11px] text-muted">
-                {adaptVariantText(copy.actions.edgedHint, variant, locale)}
-              </p>
-            </>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          <div className="card rounded-2xl p-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted">
-              {copy.settings.duration}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {DURATIONS.map((minutes) => (
-                <button
-                  key={minutes}
-                  type="button"
-                  disabled={phase === "playing" || phase === "paused"}
-                  onClick={() => setDurationMode(minutes)}
-                  aria-pressed={durationMode === minutes}
-                  className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-bold disabled:cursor-default ${
-                    durationMode === minutes
-                      ? "bg-accent text-white"
-                      : "border border-card-border text-muted-strong"
-                  }`}
-                >
-                  {minutes}m
-                </button>
-              ))}
-              <button
-                type="button"
-                disabled={phase === "playing" || phase === "paused"}
-                onClick={() => setDurationMode("custom")}
-                aria-pressed={durationMode === "custom"}
-                className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-bold disabled:cursor-default ${
-                  durationMode === "custom"
-                    ? "bg-accent text-white"
-                    : "border border-card-border text-muted-strong"
-                }`}
-              >
-                {copy.settings.customMinutes}
-              </button>
-            </div>
-            {durationMode === "custom" ? (
-              <input
-                type="number"
-                min={1}
-                max={180}
-                value={customMinutes}
-                onChange={(event) => setCustomMinutes(event.target.value)}
-                className="mt-2 w-full rounded-lg border border-card-border bg-search-bg px-2 py-1.5 text-sm text-foreground outline-none focus:border-accent"
-              />
-            ) : null}
-
-            <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.2em] text-muted">
-              {copy.settings.difficulty}
-            </p>
-            <div className="mt-2 grid grid-cols-2 gap-1.5">
-              {(["easy", "normal", "hard", "brutal"] as const).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  disabled={phase === "playing" || phase === "paused"}
-                  onClick={() => setDifficulty(option)}
-                  aria-pressed={difficulty === option}
-                  className={`cursor-pointer rounded-lg px-2 py-1.5 text-[11px] font-bold disabled:cursor-default ${
-                    difficulty === option
-                      ? "bg-accent text-white"
-                      : "border border-card-border text-muted-strong"
-                  }`}
-                >
-                  {copy.difficulties[option].label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1.5 text-[11px] text-muted">
-              {difficultyConfig.description}
-            </p>
-
-            <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.2em] text-muted">
-              {copy.settings.ending}
-            </p>
-            <select
-              value={ending}
-              disabled={phase === "playing" || phase === "paused"}
-              onChange={(event) => setEnding(event.target.value as SundomeEnding)}
-              className="mt-2 w-full cursor-pointer rounded-lg border border-card-border bg-search-bg px-2 py-1.5 text-sm text-foreground outline-none focus:border-accent"
-            >
-              {(
-                ["lottery", "allowed", "denied", "ruined", "overtime"] as const
-              ).map((option) => (
-                <option key={option} value={option}>
-                  {copy.endings[option].label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1.5 text-[11px] text-muted">
-              {adaptVariantText(copy.endings[ending].description, variant, locale)}
-            </p>
-
-            <label className="mt-4 flex items-center justify-between gap-2 text-xs text-muted-strong">
-              {copy.settings.metronome}
-              <input
-                type="checkbox"
-                checked={metronome}
-                onChange={(event) => setMetronome(event.target.checked)}
-                className="h-4 w-4 accent-[#f5a3c8]"
-              />
-            </label>
-            <label className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-strong">
-              {copy.settings.voice}
-              <input
-                type="checkbox"
-                checked={voice}
-                onChange={(event) => setVoice(event.target.checked)}
-                className="h-4 w-4 accent-[#f5a3c8]"
-              />
-            </label>
-            <label className="mt-3 block text-[11px] text-muted">
-              {copy.settings.volume}
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={volume}
-                onChange={(event) => setVolume(Number(event.target.value))}
-                className="mt-1 w-full accent-[#f5a3c8]"
-              />
-            </label>
-          </div>
-
-          <div className="card rounded-2xl p-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted">
-              {copy.settings.custom}
-            </p>
-            <div className="mt-2 space-y-2">
-              <input
-                value={customText}
-                onChange={(event) => setCustomText(event.target.value)}
-                placeholder={copy.settings.customText}
-                disabled={phase === "playing" || phase === "paused"}
-                className="w-full rounded-lg border border-card-border bg-search-bg px-2 py-1.5 text-sm text-foreground outline-none placeholder:text-muted/60 focus:border-accent"
-              />
-              <div className="flex gap-2">
-                <select
-                  value={customType}
-                  onChange={(event) => setCustomType(event.target.value as CommandType)}
-                  disabled={phase === "playing" || phase === "paused"}
-                  className="flex-1 cursor-pointer rounded-lg border border-card-border bg-search-bg px-2 py-1.5 text-xs text-foreground outline-none focus:border-accent"
-                >
-                  {(["stroke", "slow", "stop"] as const).map((type) => (
-                    <option key={type} value={type}>
-                      {copy.types[type]}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min={20}
-                  max={200}
-                  value={customBpm}
-                  onChange={(event) => setCustomBpm(event.target.value)}
-                  disabled={phase === "playing" || phase === "paused"}
-                  className="w-20 rounded-lg border border-card-border bg-search-bg px-2 py-1.5 text-xs text-foreground outline-none focus:border-accent"
-                />
-                <button
-                  type="button"
-                  disabled={
-                    !customText.trim() ||
-                    phase === "playing" ||
-                    phase === "paused"
-                  }
-                  onClick={() => {
-                    const text = customText.trim();
-                    if (!text) return;
-                    setCustomCommands((items) => [
-                      ...items,
-                      {
-                        text,
-                        type: customType,
-                        bpm: Math.min(200, Math.max(20, Number(customBpm) || 80)),
-                      },
-                    ]);
-                    setCustomText("");
-                  }}
-                  className="cursor-pointer rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white disabled:cursor-default disabled:opacity-50"
-                >
-                  {copy.settings.add}
-                </button>
-              </div>
-            </div>
-            {customCommands.length === 0 ? (
-              <p className="mt-2 text-[11px] text-muted">{copy.settings.noCustom}</p>
-            ) : (
-              <ul className="mt-2 space-y-1">
-                {customCommands.map((item, index) => (
-                  <li
-                    key={`${item.text}-${index}`}
-                    className="flex items-center gap-2 rounded-lg bg-search-bg px-2 py-1 text-[11px] text-muted-strong"
-                  >
-                    <span className="min-w-0 flex-1 truncate">{item.text}</span>
-                    <span className="shrink-0 text-muted">
-                      {copy.types[item.type]} · {item.bpm}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCustomCommands((items) =>
-                          items.filter((_, itemIndex) => itemIndex !== index),
-                        )
-                      }
-                      className="shrink-0 cursor-pointer text-[#ff8399]"
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
+  // Extra settings drawer shared between Solo setup & Remote `<details data-remote-page-more>`
+  const renderExtraSettings = () => (
+    <div className="space-y-5 pt-3">
+      {/* Voice & Metronome */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex cursor-pointer items-center justify-between rounded-xl border border-card-border px-3.5 py-2.5 text-sm">
+          <span>{copy.settings.metronome}</span>
+          <input
+            type="checkbox"
+            checked={metronome}
+            onChange={(e) => setMetronome(e.target.checked)}
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+        </label>
+        <label className="flex cursor-pointer items-center justify-between rounded-xl border border-card-border px-3.5 py-2.5 text-sm">
+          <span>{copy.settings.voice}</span>
+          <input
+            type="checkbox"
+            checked={voice}
+            onChange={(e) => setVoice(e.target.checked)}
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+        </label>
       </div>
 
-      <div className="card rounded-2xl p-4">
+      {locale === "zh" && voice && (
+        <div>
+          <p className="text-xs font-semibold text-muted-strong">
+            播报语音（真人感合成）
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {ZH_ACTORS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setVoiceActor(id)}
+                className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium ${
+                  voiceActor === id
+                    ? "border-accent bg-accent-soft text-foreground font-bold"
+                    : "border-card-border text-muted-strong hover:text-foreground"
+                }`}
+              >
+                {actorLabels[id]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <label className="flex items-center justify-between text-xs font-semibold text-muted-strong">
+          <span>{copy.settings.volume}</span>
+          <span className="tabular-nums">{Math.round(volume * 100)}%</span>
+        </label>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={volume}
+          onChange={(e) => setVolume(Number(e.target.value))}
+          className="mt-1.5 w-full accent-[var(--accent)]"
+        />
+      </div>
+
+      {/* Background Video controls */}
+      <div className="rounded-xl border border-card-border p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-bold text-foreground">{copy.video.title}</p>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="cursor-pointer rounded-lg border border-card-border px-3 py-1.5 text-xs font-bold text-foreground"
-            >
+            <label className="cursor-pointer rounded-full border border-card-border px-3 py-1 text-xs font-semibold hover:border-accent/60">
               {copy.video.local}
-            </button>
-            {!IS_STATIC_EXPORT ? (
+              <input
+                type="file"
+                accept="video/*"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (videoUrl?.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
+                  setVideoUrl(URL.createObjectURL(file));
+                  setVideoName(file.name);
+                  setVideoPlayError(false);
+                }}
+              />
+            </label>
+            {!IS_STATIC_EXPORT && (
               <button
                 type="button"
-                onClick={openSamples}
-                className="cursor-pointer rounded-lg border border-card-border px-3 py-1.5 text-xs font-bold text-foreground"
+                onClick={() => void openSamples()}
+                className="cursor-pointer rounded-full border border-card-border px-3 py-1 text-xs font-semibold hover:border-accent/60"
               >
                 {copy.video.samples}
               </button>
-            ) : null}
-            {videoUrl ? (
+            )}
+            {videoUrl && (
               <button
                 type="button"
                 onClick={() => {
+                  if (videoUrl.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
                   setVideoUrl(null);
                   setVideoName(null);
-                  setVideoPlayError(false);
                 }}
-                className="cursor-pointer rounded-lg border border-[#ff4d6d]/40 px-3 py-1.5 text-xs font-bold text-[#ff8399]"
+                className="cursor-pointer rounded-full border border-card-border px-3 py-1 text-xs text-muted hover:text-foreground"
               >
                 {copy.video.clear}
               </button>
-            ) : null}
+            )}
           </div>
         </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="video/*"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-            if (videoUrl?.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
-            setVideoUrl(URL.createObjectURL(file));
-            setVideoName(file.name);
-            setVideoPlayError(false);
-            event.target.value = "";
-          }}
-        />
 
-        {videoUrl ? (
-          <div className="mt-3">
+        <div className="mt-3 grid gap-2.5 sm:grid-cols-3 text-xs">
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-muted-strong">
+              {locale === "zh" ? "背景暗度" : "Dim"} ({videoDim}%)
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={videoDim}
+              onChange={(e) => setVideoDim(Number(e.target.value))}
+              className="w-20 accent-[var(--accent)]"
+            />
+          </label>
+          <label className="flex cursor-pointer items-center justify-between gap-2">
+            <span className="text-muted-strong">
+              {locale === "zh" ? "停止时暂停视频" : "Pause on Stop"}
+            </span>
+            <input
+              type="checkbox"
+              checked={pauseVideoOnStop}
+              onChange={(e) => setPauseVideoOnStop(e.target.checked)}
+              className="accent-[var(--accent)]"
+            />
+          </label>
+          <div className="flex items-center justify-end gap-1.5">
+            {(["contain", "cover"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setVideoFit(m)}
+                className={`cursor-pointer rounded-full border px-2.5 py-0.5 ${
+                  videoFit === m
+                    ? "border-accent bg-accent-soft text-foreground font-bold"
+                    : "border-card-border text-muted"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {videoUrl && (
+          <div className="mt-3 overflow-hidden rounded-lg border border-card-border bg-black">
             <video
               ref={videoRef}
               src={videoUrl}
-              controls
+              muted={videoMuted}
               loop
               playsInline
-              muted={videoMuted}
+              autoPlay
               onError={() => setVideoPlayError(true)}
-              onLoadedData={() => setVideoPlayError(false)}
-              className="max-h-[360px] w-full rounded-xl bg-black"
+              className="max-h-40 w-full object-contain"
             />
-            {videoPlayError ? (
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#ff4d6d]/30 bg-[#ff4d6d]/10 px-3 py-2 text-xs text-[#ff8399]">
-                <span>
-                  {locale === "zh"
-                    ? "当前视频源无法播放（可能受地区或格式限制）。"
-                    : "This video could not be played (check format or network)."}
-                </span>
-                {!IS_STATIC_EXPORT ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSamplesOpen(true);
-                      void loadSamples("alt-samples", false);
-                    }}
-                    className="cursor-pointer rounded-lg bg-accent px-2.5 py-1 text-[11px] font-bold text-white"
-                  >
-                    {locale === "zh" ? "切换到备用源 (DUGA)" : "Switch to Alt source"}
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
-              {videoName ? <span className="max-w-[40%] truncate">{videoName}</span> : null}
-              <button
-                type="button"
-                onClick={() => setVideoMuted((value) => !value)}
-                className="cursor-pointer rounded-lg border border-card-border px-2 py-1 font-bold text-muted-strong"
-              >
-                {videoMuted ? copy.video.unmute : copy.video.mute}
-              </button>
-              <label className="flex items-center gap-2">
-                {copy.video.volume}
+            {videoPlayError && (
+              <p className="p-2 text-xs text-[#ff8399]">
+                {locale === "zh"
+                  ? "该视频暂时无法播放，可尝试切换备用源或本地视频。"
+                  : "This video could not be played. Try alt-samples or a local file."}
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-2 bg-black/70 px-3 py-1.5 text-xs text-white/80">
+              <span className="truncate">{videoName ?? ""}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVideoMuted((m) => !m)}
+                  className="cursor-pointer underline"
+                >
+                  {videoMuted ? copy.video.unmute : copy.video.mute}
+                </button>
                 <input
                   type="range"
                   min={0}
                   max={1}
                   step={0.05}
                   value={videoVolume}
-                  onChange={(event) => setVideoVolume(Number(event.target.value))}
-                  className="accent-[#f5a3c8]"
+                  onChange={(e) => setVideoVolume(Number(e.target.value))}
+                  className="w-16"
                 />
-              </label>
+              </div>
             </div>
           </div>
-        ) : null}
+        )}
 
-        {!IS_STATIC_EXPORT && samplesOpen ? (
-          <div className="mt-3 rounded-2xl border border-card-border bg-search-bg p-3">
+        {!IS_STATIC_EXPORT && samplesOpen && (
+          <div className="mt-3 border-t border-card-border pt-3">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex gap-1 rounded-lg border border-card-border bg-background p-0.5">
-                {(
-                  [
-                    ["samples", locale === "zh" ? "主源 (FANZA)" : "FANZA"],
-                    ["alt-samples", locale === "zh" ? "备用源 (DUGA)" : "DUGA (Alt)"],
-                  ] as const
-                ).map(([source, label]) => (
-                  <button
-                    key={source}
-                    type="button"
-                    disabled={samplesLoading}
-                    onClick={() => void loadSamples(source, false)}
-                    aria-pressed={sampleSource === source}
-                    className={`cursor-pointer rounded-md px-2 py-1 text-[11px] font-bold disabled:cursor-default ${
-                      sampleSource === source
-                        ? "bg-accent text-white"
-                        : "text-muted-strong hover:text-foreground"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {(
+                [
+                  ["samples", locale === "zh" ? "精选 (FANZA)" : "Samples"],
+                  ["alt-samples", locale === "zh" ? "备用 (DUGA)" : "Alt Samples"],
+                  ["browse", locale === "zh" ? "浏览目录" : "Browse"],
+                ] as const
+              ).map(([src, label]) => (
+                <button
+                  key={src}
+                  type="button"
+                  disabled={samplesLoading}
+                  onClick={() => {
+                    setSampleSource(src);
+                    void loadSamples(src, false, {
+                      q: browseQuery,
+                      g: browseGenre,
+                      p: 1,
+                    });
+                  }}
+                  className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold ${
+                    sampleSource === src
+                      ? "border-accent bg-accent text-white"
+                      : "border-card-border text-muted-strong"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
               <input
-                value={sampleQuery}
-                onChange={(event) => {
-                  setSampleQuery(event.target.value);
-                  setSamplePage(0);
+                type="text"
+                value={sampleSource === "browse" ? browseQuery : sampleSearch}
+                onChange={(e) => {
+                  if (sampleSource === "browse") setBrowseQuery(e.target.value);
+                  else {
+                    setSampleSearch(e.target.value);
+                    setSamplePage(0);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && sampleSource === "browse") {
+                    setBrowsePage(1);
+                    void loadSamples("browse", false, {
+                      q: browseQuery,
+                      g: browseGenre,
+                      p: 1,
+                    });
+                  }
                 }}
                 placeholder={copy.video.search}
-                className="min-w-[180px] flex-1 rounded-lg border border-card-border bg-background px-2 py-1.5 text-xs text-foreground outline-none placeholder:text-muted/60 focus:border-accent"
+                className="min-w-0 flex-1 rounded-full border border-card-border bg-card-bg px-3 py-1 text-xs"
               />
-              <button
-                type="button"
-                onClick={() => setSamplesOpen(false)}
-                className="cursor-pointer rounded-lg border border-card-border px-3 py-1.5 text-xs font-bold text-muted-strong"
-              >
-                {copy.actions.close}
-              </button>
+              {sampleSource === "browse" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBrowsePage(1);
+                    void loadSamples("browse", false, {
+                      q: browseQuery,
+                      g: browseGenre,
+                      p: 1,
+                    });
+                  }}
+                  className="cursor-pointer rounded-full bg-accent px-3 py-1 text-xs font-bold text-white"
+                >
+                  {locale === "zh" ? "搜索" : "Go"}
+                </button>
+              )}
             </div>
 
             {samplesLoading ? (
               <p className="mt-3 text-xs text-muted">{copy.video.loading}</p>
             ) : samplesError ? (
               <p className="mt-3 text-xs text-[#ff8399]">{copy.video.error}</p>
-            ) : filteredSamples.length === 0 ? (
+            ) : pageSamples.length === 0 ? (
               <p className="mt-3 text-xs text-muted">{copy.video.noResults}</p>
             ) : (
               <>
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  {visibleSamples.map((item) => (
-                    <li
-                      key={item.cid}
-                      className="overflow-hidden rounded-xl border border-card-border bg-card-bg"
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {pageSamples.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setVideoUrl(item.previewUrl);
+                        setVideoName(item.title);
+                        setVideoPlayError(false);
+                      }}
+                      className="cursor-pointer overflow-hidden rounded-lg border border-card-border bg-card-bg text-left hover:border-accent"
                     >
-                      {item.image ? (
+                      {item.posterUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={item.image}
+                          src={item.posterUrl}
                           alt=""
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
                           className="aspect-video w-full object-cover"
                         />
                       ) : (
                         <div className="aspect-video w-full bg-black" />
                       )}
-                      <div className="p-2">
-                        <p className="line-clamp-2 text-[11px] font-bold leading-snug text-foreground">
-                          {item.title}
-                        </p>
-                        {item.actress ? (
-                          <p className="mt-0.5 text-[10px] text-muted">
-                            {item.actress}
-                          </p>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setVideoPlayError(false);
-                            setVideoUrl(item.mp4 ?? null);
-                            setVideoName(item.title);
-                            setVideoMuted(false);
-                          }}
-                          className="mt-1.5 w-full cursor-pointer rounded-lg bg-accent px-2 py-1.5 text-[10px] font-bold text-white"
-                        >
-                          {copy.video.pick}
-                        </button>
-                      </div>
-                    </li>
+                      <span className="block truncate p-1.5 text-[11px] font-medium text-foreground">
+                        {item.title}
+                      </span>
+                    </button>
                   ))}
-                </ul>
-                <div className="mt-3 flex items-center justify-center gap-3 text-xs text-muted">
+                </div>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-muted">
                   <button
                     type="button"
-                    disabled={safeSamplePage === 0}
-                    onClick={() => setSamplePage((value) => Math.max(0, value - 1))}
-                    className="cursor-pointer rounded-lg border border-card-border px-2 py-1 font-bold disabled:cursor-default disabled:opacity-40"
+                    disabled={
+                      sampleSource === "browse"
+                        ? browsePage <= 1
+                        : safeSamplePage <= 0
+                    }
+                    onClick={() => {
+                      if (sampleSource === "browse") {
+                        const np = Math.max(1, browsePage - 1);
+                        setBrowsePage(np);
+                        void loadSamples("browse", false, {
+                          q: browseQuery,
+                          g: browseGenre,
+                          p: np,
+                        });
+                      } else {
+                        setSamplePage((p) => Math.max(0, p - 1));
+                      }
+                    }}
+                    className="cursor-pointer rounded-full border border-card-border px-3 py-1 disabled:opacity-40"
                   >
                     {copy.video.prev}
                   </button>
                   <span>
-                    {copy.video.page} {safeSamplePage + 1} / {samplePageCount}
+                    {copy.video.page}{" "}
+                    {sampleSource === "browse" ? browsePage : safeSamplePage + 1}{" "}
+                    /{" "}
+                    {sampleSource === "browse"
+                      ? browseTotalPages
+                      : samplePageCount}
                   </span>
                   <button
                     type="button"
-                    disabled={safeSamplePage >= samplePageCount - 1}
-                    onClick={() =>
-                      setSamplePage((value) => Math.min(samplePageCount - 1, value + 1))
+                    disabled={
+                      sampleSource === "browse"
+                        ? browsePage >= browseTotalPages
+                        : safeSamplePage + 1 >= samplePageCount
                     }
-                    className="cursor-pointer rounded-lg border border-card-border px-2 py-1 font-bold disabled:cursor-default disabled:opacity-40"
+                    onClick={() => {
+                      if (sampleSource === "browse") {
+                        const np = browsePage + 1;
+                        setBrowsePage(np);
+                        void loadSamples("browse", false, {
+                          q: browseQuery,
+                          g: browseGenre,
+                          p: np,
+                        });
+                      } else {
+                        setSamplePage((p) =>
+                          Math.min(samplePageCount - 1, p + 1),
+                        );
+                      }
+                    }}
+                    className="cursor-pointer rounded-full border border-card-border px-3 py-1 disabled:opacity-40"
                   >
                     {copy.video.next}
                   </button>
@@ -1210,54 +1761,1374 @@ export function SundomeGame({
               </>
             )}
           </div>
-        ) : null}
+        )}
       </div>
 
-      {gateOpen && !accepted ? (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-sm rounded-3xl border border-card-border bg-background-elevated p-6">
-            <h2 className="text-xl font-bold text-foreground">{copy.gate.title}</h2>
+      {/* Custom commands editor */}
+      <div className="rounded-xl border border-card-border p-3.5">
+        <p className="text-sm font-bold text-foreground">
+          {copy.settings.custom}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <input
+            type="text"
+            value={customText}
+            onChange={(e) => setCustomText(e.target.value)}
+            placeholder={copy.settings.customText}
+            className="min-w-0 flex-1 rounded-xl border border-card-border bg-card-bg px-3 py-2 text-xs"
+          />
+          <select
+            value={customType}
+            onChange={(e) => setCustomType(e.target.value as CommandType)}
+            className="rounded-xl border border-card-border bg-card-bg px-2.5 py-2 text-xs"
+          >
+            {(["stroke", "slow", "stop"] as const).map((t) => (
+              <option key={t} value={t}>
+                {copy.types[t]}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={30}
+            max={240}
+            value={customBpm}
+            onChange={(e) => setCustomBpm(e.target.value)}
+            className="w-20 rounded-xl border border-card-border bg-card-bg px-2.5 py-2 text-xs"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const clean = customText.trim();
+              if (!clean) return;
+              const bpmNum = Number.parseInt(customBpm, 10) || 80;
+              setCustomCommands((prev) => [
+                ...prev,
+                { text: clean, type: customType, bpm: bpmNum },
+              ]);
+              setCustomText("");
+            }}
+            className="cursor-pointer rounded-xl bg-accent px-3.5 py-2 text-xs font-bold text-white"
+          >
+            {copy.settings.add}
+          </button>
+        </div>
+        {customCommands.length > 0 ? (
+          <ul className="mt-2.5 space-y-1.5 text-xs">
+            {customCommands.map((c, idx) => (
+              <li
+                key={idx}
+                className="flex items-center justify-between gap-2 rounded-lg border border-card-border px-2.5 py-1.5"
+              >
+                <span className="truncate">
+                  [{copy.types[c.type]}] {c.text} ({c.bpm} BPM)
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCustomCommands((prev) => prev.filter((_, i) => i !== idx))
+                  }
+                  className="text-muted hover:text-foreground cursor-pointer"
+                >
+                  {copy.settings.remove}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-xs text-muted">{copy.settings.noCustom}</p>
+        )}
+      </div>
+    </div>
+  );
+
+  // Determine full-screen play stage visibility
+  const inPlayStage =
+    phase === "playing" || phase === "paused" || phase === "overtime";
+  const inDonePhase =
+    phase === "permission" ||
+    phase === "denied" ||
+    phase === "ruined" ||
+    phase === "finished";
+
+  const stageBg =
+    phase === "paused"
+      ? STAGE_BG.paused
+      : STAGE_BG[command.type] ?? STAGE_BG.stroke;
+  const stageRgba =
+    phase === "paused"
+      ? "20, 16, 20"
+      : command.type === "stop"
+        ? "92, 13, 22"
+        : command.type === "slow"
+          ? "77, 52, 0"
+          : "12, 63, 44";
+
+  const cameOutcome = phase === "permission" || phase === "finished";
+  const waitingRoom = !!roomCreds;
+  const remoteStepNo = remoteInvite
+    ? "1 / 2"
+    : waitingRoom
+      ? "4 / 4"
+      : "3 / 4";
+
+  return (
+    <div>
+      {/* 18+ Age Gate */}
+      {gateOpen && (
+        <div className="fixed inset-0 z-120 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-card-border bg-card-bg p-6">
+            <h3 className="text-lg font-bold text-foreground">
+              {copy.gate.title}
+            </h3>
             <p className="mt-2 text-sm leading-relaxed text-muted-strong">
               {copy.gate.body}
             </p>
-            <div className="mt-5 flex flex-col gap-2">
+            <div className="mt-5 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => {
-                  window.sessionStorage.setItem("sundome:age", "1");
+                  try {
+                    window.localStorage.setItem(AGE_KEY, "1");
+                  } catch {}
                   setAccepted(true);
                   setGateOpen(false);
                   beginGame();
                 }}
-                className="cursor-pointer rounded-2xl bg-accent px-4 py-3 text-sm font-bold text-white"
+                className="cursor-pointer rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white"
               >
                 {copy.gate.confirm}
               </button>
-              <Link
-                href={localePath(locale, "")}
-                className="rounded-2xl border border-card-border px-4 py-3 text-center text-sm font-bold text-muted-strong"
+              <button
+                type="button"
+                onClick={() => setGateOpen(false)}
+                className="cursor-pointer rounded-full border border-card-border px-4 py-2.5 text-sm text-muted-strong"
               >
                 {copy.gate.under18}
-              </Link>
+              </button>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
 
-      <p className="text-center text-[11px] text-muted">
-        {locale === "zh"
-          ? "空格暂停 · E 报告边缘 · Esc 退出"
-          : "Space pauses · E reports an edge · Esc quits"}
-      </p>
-      <p className="text-[11px] text-muted">{copy.disclaimer}</p>
-      <p className="text-[11px] text-muted">
-        {copy.status.command}: {copy.types.stroke} / {copy.types.slow} /{" "}
-        {copy.types.stop}
-      </p>
+      {/* Full-Screen Play Stage */}
+      {inPlayStage && (
+        <div
+          data-sundome="play"
+          data-body={body}
+          data-mode={command.type === "stroke" ? "go" : command.type}
+          data-paused={phase === "paused" ? "true" : "false"}
+          data-edges={edges}
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-100 flex flex-col text-white transition-colors duration-500"
+          style={{ background: stageBg, touchAction: "manipulation" }}
+        >
+          <div className="absolute inset-0 -z-10 bg-[#0a0708]" aria-hidden="true" />
+          <div
+            aria-hidden="true"
+            data-sundome-bg
+            className="absolute inset-0 -z-10 transition-colors duration-500"
+            style={{ background: stageBg }}
+          />
+
+          {videoUrl && (
+            <>
+              <video
+                ref={videoRef}
+                src={videoUrl}
+                muted={videoMuted}
+                loop
+                playsInline
+                autoPlay
+                className={`pointer-events-none fixed inset-0 -z-10 h-full w-full ${
+                  videoFit === "cover" ? "object-cover" : "object-contain"
+                }`}
+              />
+              <div
+                aria-hidden="true"
+                data-sundome-mirror-dim
+                className="pointer-events-none fixed inset-0 -z-10 transition-colors duration-500"
+                style={{
+                  background: `rgba(${stageRgba}, ${(0.45 * videoDim) / 100})`,
+                }}
+              />
+              {/* Double-tap seek zones */}
+              <div
+                aria-hidden="true"
+                onClick={() => handleStageTap("left")}
+                className="fixed inset-y-16 left-0 z-0 w-1/3"
+              />
+              <div
+                aria-hidden="true"
+                onClick={() => handleStageTap("right")}
+                className="fixed inset-y-16 right-0 z-0 w-1/3"
+              />
+              {seekFlash && (
+                <div className="sundome-seek-flash" key={seekFlash}>
+                  <span>{seekFlash}</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Top Bar */}
+          <div
+            className="relative z-20 flex items-center justify-between gap-2 px-3 pt-3 text-sm sm:gap-3 sm:px-4"
+            style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+          >
+            <span className="min-w-0 flex-1 truncate text-base italic text-white/75">
+              {partner ? (
+                <span data-sundome-count={cmdCount} data-sundome-partner-no={cmdCount}>
+                  {pText.badge} · #{cmdCount}
+                </span>
+              ) : extendRound > 0 ? (
+                <span data-sundome-count={cmdCount} className="font-bold not-italic text-white">
+                  +{extendRound}
+                </span>
+              ) : (
+                <span data-sundome-count={cmdCount}>#{cmdCount}</span>
+              )}
+              <span className="ml-2 not-italic text-white/55">
+                {copy.status.edges}: {edges}
+              </span>
+            </span>
+
+            <span
+              className="shrink-0 tabular-nums text-lg font-bold"
+              data-sundome-clock
+            >
+              {formatTime(timeLeft)}
+            </span>
+
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              {videoUrl && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVideoFit((f) => (f === "contain" ? "cover" : "contain"))
+                  }
+                  className="inline-flex h-7 cursor-pointer items-center justify-center rounded-full border border-white/25 px-2.5 text-xs text-white/80 hover:bg-white/10"
+                >
+                  {videoFit === "contain" ? "Cover" : "Contain"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => nextCommand(false)}
+                className="inline-flex h-7 cursor-pointer items-center justify-center rounded-full border border-white/25 px-2.5 text-xs text-white/80 hover:bg-white/10"
+              >
+                {locale === "zh" ? "下一条" : "Skip"}
+              </button>
+              <button
+                type="button"
+                onClick={togglePause}
+                className="inline-flex h-7 cursor-pointer items-center justify-center rounded-full border border-white/25 px-2.5 text-xs text-white/80 hover:bg-white/10"
+              >
+                {phase === "paused" ? copy.actions.resume : copy.actions.pause}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isRemote) {
+                    if (quitArmed) quitGame();
+                    else setQuitArmed(true);
+                  } else {
+                    quitGame();
+                  }
+                }}
+                className="inline-flex h-7 cursor-pointer items-center justify-center rounded-full border border-white/25 px-2.5 text-xs text-white/80 hover:bg-white/10"
+              >
+                {quitArmed ? rMore.quitAgain : copy.actions.quit}
+              </button>
+            </div>
+          </div>
+
+          {/* Center Play Content */}
+          <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-5 pb-4 text-center">
+            {/* Remote status pills (part / grip / speed) */}
+            {(isRemote || peerOnline) && (
+              <div className="mb-3 flex flex-wrap justify-center gap-2 text-xs">
+                <span className="rounded-full border border-white/25 bg-black/40 px-2.5 py-0.5 font-bold">
+                  {rText.badge} · {peerOnline ? rText.peerOn : rText.waitingPeer}
+                </span>
+                {remotePart && (
+                  <span className="rounded-full border border-white/30 bg-white/15 px-2.5 py-0.5 font-bold">
+                    {rMore.part[remotePart]}
+                  </span>
+                )}
+                {remoteGrip !== "normal" && (
+                  <span className="rounded-full border border-white/30 bg-white/15 px-2.5 py-0.5 font-bold">
+                    {rV2.grip5[remoteGrip]}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Incoming Say / Line Banner (8s) */}
+            {remoteOverlay && (
+              <div
+                className="mb-4 max-w-lg animate-fade-in rounded-2xl border border-white/40 bg-black/65 px-5 py-3 text-base font-bold text-white shadow-lg"
+                data-remote-player-overlay
+              >
+                {remoteOverlay.text}
+              </div>
+            )}
+
+            <div className="max-w-xl">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/65">
+                {phase === "paused"
+                  ? copy.status.paused
+                  : phase === "overtime"
+                    ? copy.status.overtime
+                    : copy.types[command.type]}
+                {command.type !== "stop" && command.bpm > 0
+                  ? ` · ${command.bpm} BPM`
+                  : ""}
+              </p>
+              <h2 className="mt-3 text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
+                {adaptVariantText(command.text, locale, body)}
+              </h2>
+            </div>
+
+            <div className="mt-4 h-1 w-40 overflow-hidden rounded-full bg-white/15" aria-hidden="true">
+              <div
+                key={cmdCount}
+                className="h-full w-full origin-left rounded-full bg-white/80"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleEdge}
+              disabled={edgeCooldown > 0}
+              data-sundome-edge
+              className="mt-6 cursor-pointer rounded-full border-2 border-white/60 px-6 py-3 text-base font-bold text-white transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/20 disabled:text-white/30"
+            >
+              {edgeCooldown > 0
+                ? `${copy.status.edgeCooldown} (${edgeCooldown}s)`
+                : copy.actions.edged}
+            </button>
+
+            {/* Remote Player Reaction Drawer (.rr) */}
+            {(peerOnline || isRemote) && (
+              <div
+                className="rr mt-4 [@media(max-height:700px)]:mt-2"
+                data-sundome-remote-react
+                data-remote-react-v2="1"
+                data-hidden={reactCollapsed ? "1" : undefined}
+              >
+                <div className="rr-headrow">
+                  <button
+                    type="button"
+                    onClick={() => setReactCollapsed((v) => !v)}
+                    aria-expanded={!reactCollapsed}
+                    data-sundome-remote-react-toggle
+                    className="rr-head"
+                  >
+                    <span>{rMore.reactTitle}</span>
+                    {roomCreds?.open && watchCount > 0 && (
+                      <WatchPill n={watchCount} lang={locale} />
+                    )}
+                    <span aria-hidden="true" className="rr-caret">
+                      {reactCollapsed ? "▸" : "▾"}
+                    </span>
+                  </button>
+                  {!reactCollapsed && (
+                    <button
+                      type="button"
+                      onClick={() => setReactSettingsOpen(true)}
+                      className="rr-gear"
+                      aria-label={rCtl.reactSettings}
+                      title={rCtl.reactSettings}
+                      data-remote-react-settings-open
+                    >
+                      <GearIcon />
+                    </button>
+                  )}
+                </div>
+
+                {!reactCollapsed && (
+                  <>
+                    <div
+                      className={`rr-cats${favReacts.length ? " rr-cats-fav" : ""}`}
+                      role="tablist"
+                    >
+                      {reactTabs.map((tab, idx) => (
+                        <button
+                          key={tab.k}
+                          type="button"
+                          role="tab"
+                          aria-selected={safeReactCat === idx}
+                          aria-label={tab.k === "fav" ? rCtl.fav : undefined}
+                          className={safeReactCat === idx ? "on" : ""}
+                          onClick={() => {
+                            setReactCatIdx(idx);
+                            const el = reactPagerRef.current;
+                            if (el) {
+                              el.scrollTo({
+                                left: idx * (el.clientWidth + 8),
+                                behavior: "smooth",
+                              });
+                            }
+                          }}
+                          data-remote-react-cat={tab.k}
+                        >
+                          {tab.k === "fav" ? <StarIcon /> : tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div
+                      ref={reactPagerRef}
+                      className="rr-pager"
+                      data-remote-react-grid
+                      onScroll={(e) => {
+                        const el = e.currentTarget;
+                        const idx = Math.round(el.scrollLeft / (el.clientWidth + 8));
+                        if (idx !== reactCatIdx && idx < reactTabs.length) {
+                          setReactCatIdx(idx);
+                        }
+                      }}
+                    >
+                      {reactTabs.map((tab) => (
+                        <div key={tab.k} className="rr-grid">
+                          {tab.keys.map((rk) => (
+                            <button
+                              key={rk}
+                              type="button"
+                              disabled={!peerOnline}
+                              onClick={() => {
+                                setReactSentKey(rk);
+                                remoteLinkRef.current?.send({ t: "signal", k: rk });
+                                window.setTimeout(() => setReactSentKey(null), 1500);
+                              }}
+                              {...(tab.k === "fav"
+                                ? { "data-remote-react-fav": rk }
+                                : { "data-remote-react": rk })}
+                              data-sent={reactSentKey === rk ? "1" : undefined}
+                              className={reactSentKey === rk ? "sent" : ""}
+                            >
+                              <Phrase
+                                text={
+                                  rV2.react[rk as keyof typeof rV2.react] ?? rk
+                                }
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="rr-lab">
+                      <span>{rV2.levelAsk}</span>
+                      <span>{rV2.levelHint}</span>
+                    </p>
+                    <div className="rr-lv9">
+                      {Array.from(
+                        { length: REMOTE_CONSTANTS.REMOTE_LEVELS },
+                        (_, i) => i + 1,
+                      ).map((lv) => (
+                        <button
+                          key={lv}
+                          type="button"
+                          onClick={() => {
+                            setArousalLevel(lv);
+                            arousalRef.current = lv;
+                            remoteLinkRef.current?.send({ t: "level", k: lv });
+                          }}
+                          aria-pressed={arousalLevel === lv}
+                          data-remote-level-btn={lv}
+                          className={
+                            arousalLevel === lv
+                              ? "on"
+                              : lv <= arousalLevel
+                                ? "half"
+                                : ""
+                          }
+                        >
+                          {lv}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <div className="rr-row">
+                  <button
+                    type="button"
+                    onClick={handleLostOrCame}
+                    data-sundome-lost
+                    className="rr-came"
+                  >
+                    {locale === "zh" ? "没忍住（结束了）" : "Came / Lost control"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (quitArmed) quitGame();
+                      else setQuitArmed(true);
+                    }}
+                    data-remote-self-quit
+                    data-armed={quitArmed ? "1" : undefined}
+                    className={`rr-quit${quitArmed ? " arm" : ""}`}
+                  >
+                    {quitArmed ? rMore.quitAgain : copy.actions.quit}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Done Screen */}
+      {inDonePhase && (
+        <section
+          data-sundome="done"
+          className={`mb-6 rounded-3xl border p-6 sm:p-8 ${
+            cameOutcome
+              ? "border-accent/50 bg-accent-soft"
+              : "border-card-border bg-card-bg"
+          }`}
+        >
+          <h2 className="text-2xl font-extrabold text-foreground">
+            {phase === "permission"
+              ? copy.status.permission
+              : phase === "denied"
+                ? copy.status.denied
+                : phase === "ruined"
+                  ? copy.status.ruined
+                  : copy.status.finished}
+          </h2>
+          <p className="mt-2 text-sm text-muted-strong">
+            {phase === "permission"
+              ? copy.status.permissionHint
+              : phase === "denied"
+                ? copy.status.deniedHint
+                : phase === "ruined"
+                  ? copy.status.ruinedHint
+                  : copy.status.command}
+          </p>
+          {activeRoll !== null && (
+            <p className="mt-1 text-xs tabular-nums text-muted">
+              {copy.status.chance}: {diffInfo.chance}% · Roll {activeRoll}
+            </p>
+          )}
+
+          {doneTrace && (
+            <div className="mt-5 rounded-2xl border border-card-border bg-black/25 p-4">
+              <SundomeArc trace={doneTrace} came={cameOutcome} />
+            </div>
+          )}
+
+          {/* Post-session Remote After & Thanks */}
+          {isRemote && (
+            <div className="mt-5 space-y-3">
+              {peerOnline && (
+                <div
+                  className="rounded-2xl border border-card-border px-4 py-3 text-left"
+                  data-remote-thx
+                >
+                  <p className="text-xs font-bold text-muted-strong">
+                    {rV2.thxTitle}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(["thanks", "fun", "again"] as const).map((tk) => (
+                      <button
+                        key={tk}
+                        type="button"
+                        disabled={!!thxSent}
+                        onClick={() => {
+                          setThxSent(tk);
+                          remoteLinkRef.current?.send({ t: "thx", k: tk });
+                        }}
+                        className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-bold ${
+                          thxSent === tk
+                            ? "border-accent bg-accent text-white"
+                            : "border-card-border text-foreground"
+                        }`}
+                      >
+                        {rV2.thx[tk]}
+                      </button>
+                    ))}
+                    {thxGot && (
+                      <b className="self-center text-xs text-accent">
+                        {rV2.thxGot.replace(
+                          "{x}",
+                          rV2.thx[thxGot as keyof typeof rV2.thx] ?? thxGot,
+                        )}
+                      </b>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div
+                className="rounded-2xl border border-card-border px-4 py-3 text-left"
+                data-remote-after
+              >
+                <p
+                  className={`flex items-center gap-1.5 text-xs font-bold ${
+                    peerOnline ? "text-emerald-400" : "text-muted-strong"
+                  }`}
+                >
+                  <span>●</span>
+                  {peerOnline ? rAfter.peerHere : rAfter.peerGone}
+                </p>
+                <div className="mt-2 flex flex-col gap-2">
+                  {peerOnline ? (
+                    <button
+                      type="button"
+                      onClick={() => beginGame()}
+                      className="w-full cursor-pointer rounded-xl bg-accent px-4 py-3 text-sm font-bold text-white"
+                    >
+                      {rAfter.againSame}
+                    </button>
+                  ) : (
+                    roomCreds?.open && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhase("idle");
+                          void handleCreateRemoteRoom();
+                        }}
+                        className="w-full cursor-pointer rounded-xl bg-accent px-4 py-3 text-sm font-bold text-white"
+                      >
+                        {rAfter.recruitAgain}
+                      </button>
+                    )
+                  )}
+                  {peerOnline && roomCreds?.open && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        remoteLinkRef.current?.end();
+                        setPhase("idle");
+                        void handleCreateRemoteRoom();
+                      }}
+                      className="w-full cursor-pointer rounded-xl border border-card-border px-4 py-2.5 text-sm font-bold text-foreground"
+                    >
+                      {queueCount > 0
+                        ? rAfter.nextQueue.replace("{n}", String(queueCount))
+                        : rAfter.recruitOther}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => beginGame()}
+              className="cursor-pointer rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white"
+            >
+              {copy.status.playAgain}
+            </button>
+            <button
+              type="button"
+              onClick={quitGame}
+              className="cursor-pointer rounded-full border border-card-border px-5 py-2.5 text-sm font-semibold text-foreground"
+            >
+              {copy.actions.close}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Setup Card (Step 3/4 or 4/4 in Remote Mode, or Standard Solo Setup) */}
+      {phase === "idle" && (
+        <section
+          data-sundome="setup"
+          data-sundome-remote-only={remoteOnly ?? undefined}
+          data-remote-page-phase={
+            waitingRoom ? (peerOnline ? "came" : "wait") : "setup"
+          }
+          className="card scroll-mt-20 rounded-2xl p-5 sm:p-8"
+        >
+          {(remoteOnly || remoteInvite) && (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p
+                    className="text-[11px] font-bold tabular-nums tracking-[0.15em] text-accent"
+                    data-remote-step-no={remoteStepNo}
+                  >
+                    {rPage.step
+                      .replace("{n}", remoteStepNo.split(" / ")[0])
+                      .replace("{m}", remoteStepNo.split(" / ")[1])}
+                  </p>
+                  <h2 className="mt-0.5 text-lg font-bold tracking-tight text-foreground">
+                    {remoteInvite
+                      ? rPage.joinTitle
+                      : waitingRoom
+                        ? peerOnline
+                          ? rPage.cameHead
+                          : rPage.waitHead
+                        : remoteOnly === "open"
+                          ? rPage.setupOpen
+                          : rPage.setupLink}
+                  </h2>
+                </div>
+                {onRemoteBack && !waitingRoom && !remoteInvite && (
+                  <button
+                    type="button"
+                    onClick={onRemoteBack}
+                    className="shrink-0 cursor-pointer rounded-full border border-card-border px-3 py-1.5 text-xs font-medium text-muted-strong hover:text-foreground"
+                    data-remote-page-back
+                  >
+                    ‹ {rPage.back}
+                  </button>
+                )}
+              </div>
+
+              <p
+                className="mt-1 text-xs leading-relaxed text-muted-strong [word-break:keep-all] [overflow-wrap:anywhere]"
+                data-sundome-summary
+              >
+                {waitingRoom ? (
+                  peerOnline ? null : (
+                    <>
+                      <Phrase
+                        text={
+                          roomCreds?.open ? rPage.waitOpen : rPage.waitLink
+                        }
+                      />
+                      <RemoteElapsed since={waitingSince} fmt={rPage.waitFor} />
+                    </>
+                  )
+                ) : (
+                  <Phrase
+                    text={remoteInvite ? rPage.joinNote : rPage.setupNote}
+                  />
+                )}
+              </p>
+            </>
+          )}
+
+          {/* Setup controls (hidden during 4/4 waiting room unless peer not yet waiting) */}
+          {!waitingRoom && (
+            <div className="mt-5 space-y-5">
+              {/* Body Q (in remote setup) */}
+              {(remoteOnly || remoteInvite) && (
+                <div data-remote-body-q>
+                  <p
+                    className="text-sm font-bold text-foreground"
+                    id="remote-body-q"
+                  >
+                    {rPage.bodyQ}
+                  </p>
+                  <div
+                    className="mt-2 flex flex-wrap gap-2"
+                    role="radiogroup"
+                    aria-labelledby="remote-body-q"
+                  >
+                    {(["male", "female", "gay", "lesbian"] as const).map((b) => (
+                      <button
+                        key={b}
+                        type="button"
+                        onClick={() => setBody(b)}
+                        data-testid={`body-${b}`}
+                        className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-xs font-bold ${
+                          body === b
+                            ? "border-accent bg-accent text-white"
+                            : "border-card-border text-muted-strong hover:text-foreground"
+                        }`}
+                      >
+                        {rPage.bodyName[b]}
+                      </button>
+                    ))}
+                  </div>
+                  <p
+                    className="mt-2 text-xs font-bold leading-relaxed text-foreground"
+                    data-remote-body-out={body}
+                  >
+                    <Phrase text={rPage.bodyOut[body]} />
+                  </p>
+                </div>
+              )}
+
+              {/* Duration */}
+              <div>
+                <p className="text-sm font-bold text-foreground">
+                  {copy.settings.duration}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[3, 5, 10, 15, 20].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setDurationMode(m)}
+                      className={`cursor-pointer rounded-full border px-4 py-1.5 text-xs font-bold ${
+                        durationMode === m
+                          ? "border-accent bg-accent text-white"
+                          : "border-card-border text-muted-strong hover:text-foreground"
+                      }`}
+                    >
+                      {m} min
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setDurationMode("custom")}
+                    className={`cursor-pointer rounded-full border px-4 py-1.5 text-xs font-bold ${
+                      durationMode === "custom"
+                        ? "border-accent bg-accent text-white"
+                        : "border-card-border text-muted-strong hover:text-foreground"
+                    }`}
+                  >
+                    {copy.settings.customMinutes}
+                  </button>
+                </div>
+                {durationMode === "custom" && (
+                  <input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={customMinutes}
+                    onChange={(e) => setCustomMinutes(e.target.value)}
+                    className="mt-2 w-28 rounded-xl border border-card-border bg-card-bg px-3 py-1.5 text-sm"
+                  />
+                )}
+              </div>
+
+              {/* Difficulty */}
+              <div>
+                <p className="text-sm font-bold text-foreground">
+                  {copy.settings.difficulty}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(["easy", "normal", "hard", "brutal"] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDifficulty(d)}
+                      className={`cursor-pointer rounded-xl border px-3 py-2 text-left text-xs ${
+                        difficulty === d
+                          ? "border-accent bg-accent-soft text-foreground font-bold"
+                          : "border-card-border text-muted-strong"
+                      }`}
+                    >
+                      <span className="block text-sm font-bold">
+                        {copy.difficulties[d].label}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] opacity-75">
+                        {copy.difficulties[d].description}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ending */}
+              <div>
+                <p className="text-sm font-bold text-foreground">
+                  {copy.settings.ending}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(
+                    ["lottery", "allowed", "denied", "ruined", "overtime"] as const
+                  ).map((endKey) => (
+                    <button
+                      key={endKey}
+                      type="button"
+                      onClick={() => setEnding(endKey)}
+                      className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-xs font-bold ${
+                        ending === endKey
+                          ? "border-accent bg-accent text-white"
+                          : "border-card-border text-muted-strong hover:text-foreground"
+                      }`}
+                    >
+                      {copy.endings[endKey].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Remote Wishes, Limits, Extensions, Reply Settings */}
+              {(remoteOnly || remoteInvite) && (
+                <>
+                  {/* Wishes */}
+                  <div>
+                    <p className="text-sm font-bold text-foreground">
+                      {rWish.title}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {REMOTE_CONSTANTS.REMOTE_WISHES.map((wk) => {
+                        const on = wishes.includes(wk);
+                        return (
+                          <button
+                            key={wk}
+                            type="button"
+                            onClick={() => {
+                              setWishes((prev) =>
+                                prev.includes(wk)
+                                  ? prev.filter((x) => x !== wk)
+                                  : cleanWishes([...prev, wk]),
+                              );
+                            }}
+                            className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-bold ${
+                              on
+                                ? "border-accent bg-accent-soft text-foreground"
+                                : "border-card-border text-muted-strong"
+                            }`}
+                          >
+                            {rWish.tag[wk]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Allowed body spots */}
+                  <div>
+                    <p className="text-sm font-bold text-foreground">
+                      {limText.partsQ}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {allBodySpots.map((spot) => {
+                        const on = activeParts.includes(spot);
+                        return (
+                          <button
+                            key={spot}
+                            type="button"
+                            data-testid={`part-${spot}`}
+                            onClick={() => {
+                              const nextSpots = on
+                                ? activeParts.filter((x) => x !== spot)
+                                : [...activeParts, spot];
+                              if (!nextSpots.length) return;
+                              const nextLim: RemoteLimits = {
+                                ...limits,
+                                ap:
+                                  nextSpots.length === allBodySpots.length
+                                    ? undefined
+                                    : nextSpots,
+                              };
+                              setLimits(nextLim);
+                              saveLimits(nextLim);
+                            }}
+                            className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-bold ${
+                              on
+                                ? "border-accent bg-accent-soft text-foreground"
+                                : "border-card-border text-muted"
+                            }`}
+                          >
+                            {rMore.part[spot]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted-strong">
+                      {limText.partsNote}
+                    </p>
+                  </div>
+
+                  {/* NG & Caps accordion */}
+                  <details
+                    className="rounded-xl border border-card-border px-3 py-2"
+                    data-remote-ng
+                    open={!!(limits.nh || limits.gm || limits.sm || limits.nn) || undefined}
+                  >
+                    <summary className="cursor-pointer py-1 text-sm font-bold text-foreground">
+                      {limText.ngTitle}
+                    </summary>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        data-testid="ng-harsh"
+                        onClick={() => {
+                          const next = { ...limits, nh: !limits.nh };
+                          setLimits(next);
+                          saveLimits(next);
+                        }}
+                        className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-bold ${
+                          limits.nh
+                            ? "border-accent bg-accent text-white"
+                            : "border-card-border text-muted-strong"
+                        }`}
+                      >
+                        {limText.harsh}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="ng-now"
+                        onClick={() => {
+                          const next = { ...limits, nn: !limits.nn };
+                          setLimits(next);
+                          saveLimits(next);
+                        }}
+                        className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-bold ${
+                          limits.nn
+                            ? "border-accent bg-accent text-white"
+                            : "border-card-border text-muted-strong"
+                        }`}
+                      >
+                        {limText.nowNg}
+                      </button>
+                    </div>
+                    <p className="mt-3 text-xs font-bold text-muted-strong">
+                      {limText.gripCap}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {REMOTE_CONSTANTS.GRIP_CAPS.map((gc) => {
+                        const on = (limits.gm ?? "harder") === gc;
+                        return (
+                          <button
+                            key={gc}
+                            type="button"
+                            data-testid={`ng-grip-${gc}`}
+                            onClick={() => {
+                              const next = {
+                                ...limits,
+                                gm: gc === "harder" ? undefined : gc,
+                              };
+                              setLimits(next);
+                              saveLimits(next);
+                            }}
+                            className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-bold ${
+                              on
+                                ? "border-accent bg-accent-soft text-foreground"
+                                : "border-card-border text-muted-strong"
+                            }`}
+                          >
+                            {gc === "harder"
+                              ? limText.capNone
+                              : limText.capUpTo.replace("{x}", rV2.grip5[gc])}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-3 text-xs font-bold text-muted-strong">
+                      {limText.speedCap}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {(["mid", "fast", "vfast", "vmax"] as const).map((sc) => {
+                        const on = (limits.sm ?? "vmax") === sc;
+                        return (
+                          <button
+                            key={sc}
+                            type="button"
+                            data-testid={`ng-speed-${sc}`}
+                            onClick={() => {
+                              const next = {
+                                ...limits,
+                                sm: sc === "vmax" ? undefined : sc,
+                              };
+                              setLimits(next);
+                              saveLimits(next);
+                            }}
+                            className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-bold ${
+                              on
+                                ? "border-accent bg-accent-soft text-foreground"
+                                : "border-card-border text-muted-strong"
+                            }`}
+                          >
+                            {sc === "vmax"
+                              ? limText.capNone
+                              : limText.capUpTo.replace("{x}", rDrive.level[sc])}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </details>
+
+                  {/* Max Extensions */}
+                  <div data-remote-ext-q>
+                    <p className="text-sm font-bold text-foreground">
+                      {rV2.extQ}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {REMOTE_CONSTANTS.EXT_CHOICES.map((cnt) => (
+                        <button
+                          key={cnt}
+                          type="button"
+                          data-testid={`ext-${cnt}`}
+                          onClick={() => {
+                            setExtMax(cnt);
+                            saveExtMax(cnt);
+                          }}
+                          className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-bold ${
+                            extMax === cnt
+                              ? "border-accent bg-accent text-white"
+                              : "border-card-border text-muted-strong"
+                          }`}
+                        >
+                          {cnt < 0
+                            ? rV2.extFree
+                            : rV2.extTimes.replace("{n}", String(cnt))}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Reply button settings modal trigger */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setReactSettingsOpen(true)}
+                      className="cursor-pointer rounded-full border border-card-border px-4 py-2 text-xs font-bold text-foreground hover:border-accent"
+                      data-remote-react-settings-open
+                    >
+                      {rCtl.reactSettings}
+                    </button>
+                  </div>
+
+                  <details
+                    className="rounded-xl border border-card-border px-3 py-2"
+                    data-remote-page-more
+                  >
+                    <summary className="cursor-pointer py-1 text-sm font-medium text-muted-strong">
+                      {rPage.more}
+                    </summary>
+                    {renderExtraSettings()}
+                  </details>
+                </>
+              )}
+
+              {/* Extra Settings directly open in solo setup */}
+              {!remoteOnly && !remoteInvite && renderExtraSettings()}
+            </div>
+          )}
+
+          {/* Action CTA in Setup / Waiting */}
+          {remoteOnly ? (
+            !waitingRoom ? (
+              <div className="mt-6 space-y-3">
+                <p className="text-xs font-bold text-foreground">
+                  <Phrase text={rPage.setupNext} />
+                </p>
+                <button
+                  type="button"
+                  disabled={makingRoom}
+                  onClick={() => void handleCreateRemoteRoom()}
+                  data-remote-make-room
+                  className="rpri w-full cursor-pointer rounded-xl px-6 py-4 text-base font-bold disabled:opacity-60"
+                >
+                  {makingRoom
+                    ? rText.making
+                    : remoteOnly === "open"
+                      ? rText.recruitBtn
+                      : rText.makeBtn}
+                </button>
+                {makeRoomError && (
+                  <p className="text-xs text-[#ff8399]">{rText.makeFailed}</p>
+                )}
+              </div>
+            ) : (
+              /* 4 / 4 Waiting Card */
+              <div className="mt-5 space-y-4">
+                {peerOnline ? (
+                  <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4">
+                    <p className="text-base font-bold text-emerald-300">
+                      ● {rReady.joinTitle}
+                    </p>
+                    <p className="mt-1 text-xs text-white/80">
+                      {autoCountdown !== null && autoCountdown > 0
+                        ? rReady.autoLead.replace("{n}", String(autoCountdown))
+                        : rReady.autoNow}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={startGame}
+                        className="cursor-pointer rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white"
+                      >
+                        {rReady.joinStart}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelRemoteRoom}
+                        className="cursor-pointer rounded-full border border-card-border px-4 py-2.5 text-xs font-semibold text-muted-strong"
+                      >
+                        {rReady.autoCancel}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-card-border bg-card-bg p-4 space-y-3">
+                    <p className="text-xs font-bold text-muted-strong">
+                      {roomCreds.open ? rText.recruitReady : rText.linkReady}
+                    </p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="text"
+                        readOnly
+                        value={remoteControlLink}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="min-w-0 flex-1 rounded-xl border border-card-border bg-background/60 px-3 py-2 text-xs font-mono text-foreground"
+                        data-remote-share-url
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard
+                            ?.writeText(remoteControlLink)
+                            .then(() => {
+                              setRemoteCopied(true);
+                              window.setTimeout(() => setRemoteCopied(false), 2000);
+                            });
+                        }}
+                        className="cursor-pointer rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white"
+                      >
+                        {remoteCopied ? rText.copied : rText.copy}
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted">
+                      {remoteStatus === "open"
+                        ? roomCreds.open
+                          ? rText.recruitWaiting
+                          : rText.waitingPeer
+                        : rText.reconnecting}
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={startGame}
+                        className="cursor-pointer rounded-full border border-card-border px-4 py-2 text-xs font-bold text-foreground hover:border-accent"
+                      >
+                        {rPage.soloStart}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelRemoteRoom}
+                        className="cursor-pointer rounded-full border border-card-border px-4 py-2 text-xs text-muted hover:text-foreground"
+                      >
+                        {roomCreds.open ? rText.recruitCancel : rText.cancel}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          ) : remoteInvite ? (
+            <div className="mt-6 space-y-3">
+              <p className="text-xs text-muted">
+                {remoteStatus === "forbidden"
+                  ? rPage.joinBad
+                  : peerOnline
+                    ? rText.peerOn
+                    : rPage.joinWait}
+              </p>
+              <button
+                type="button"
+                disabled={remoteStatus === "forbidden"}
+                onClick={startGame}
+                className="rpri w-full cursor-pointer rounded-xl px-6 py-4 text-base font-bold disabled:opacity-40"
+              >
+                {copy.actions.start}
+              </button>
+            </div>
+          ) : partner ? (
+            <div className="mt-6">
+              {(() => {
+                const ph = partnerPhase(
+                  partner.startAt,
+                  partner.s.duration,
+                  partnerClock,
+                );
+                if (ph.phase === "after") {
+                  return (
+                    <p className="text-sm font-bold text-muted-strong">
+                      {pText.ended}
+                    </p>
+                  );
+                }
+                return (
+                  <div className="rounded-2xl border border-accent/40 bg-accent-soft p-4">
+                    <p className="text-sm font-bold text-foreground">
+                      {pText.guestTitle}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-strong">
+                      {ph.phase === "before"
+                        ? pText.countdown.replace(
+                            "{t}",
+                            formatTime(Math.ceil(ph.untilStartMs / 1000)),
+                          )
+                        : pText.startingNow}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={startGame}
+                      className="mt-3 cursor-pointer rounded-full bg-accent px-5 py-2 text-xs font-bold text-white"
+                    >
+                      {copy.actions.start}
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="mt-6 space-y-4">
+              <button
+                type="button"
+                onClick={startGame}
+                className="rpri w-full cursor-pointer rounded-xl px-6 py-4 text-base font-bold"
+              >
+                {copy.actions.start}
+              </button>
+
+              {/* 2-Player Synchronized Mode (Partner link card) */}
+              <div className="rounded-2xl border border-card-border p-4">
+                <p className="text-sm font-bold text-foreground">
+                  {pText.sectionTitle}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  {pText.sectionLead}
+                </p>
+                {!partnerUrl ? (
+                  <button
+                    type="button"
+                    onClick={handleCreatePartnerLink}
+                    className="mt-3 cursor-pointer rounded-full border border-card-border px-4 py-2 text-xs font-bold text-foreground hover:border-accent"
+                  >
+                    {pText.makeBtn}
+                  </button>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-bold text-accent">
+                      {pText.hostTitle} ·{" "}
+                      {partnerStartAt
+                        ? formatStartAt(partnerStartAt, locale)
+                        : ""}
+                    </p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="text"
+                        readOnly
+                        value={partnerUrl}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="min-w-0 flex-1 rounded-xl border border-card-border bg-card-bg px-3 py-2 text-xs font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(partnerUrl).then(() => {
+                            setPartnerCopied(true);
+                            window.setTimeout(() => setPartnerCopied(false), 2000);
+                          });
+                        }}
+                        className="cursor-pointer rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white"
+                      >
+                        {partnerCopied ? rText.copied : rText.copy}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      <ReactSettingsModal
+        lang={locale}
+        body={body}
+        open={reactSettingsOpen}
+        onClose={() => setReactSettingsOpen(false)}
+      />
     </div>
   );
 }

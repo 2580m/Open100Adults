@@ -28,6 +28,10 @@ const serverOnlyDirs = [
     src: path.join(webDir, "src", "app", "[lang]", "sundome", "remote"),
     dst: path.join(backupDir, "remote"),
   },
+  {
+    src: path.join(webDir, "src", "app", "[lang]", "sundome", "c"),
+    dst: path.join(backupDir, "c"),
+  },
 ];
 
 function moveDir(from, to) {

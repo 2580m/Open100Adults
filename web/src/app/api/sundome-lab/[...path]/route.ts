@@ -47,9 +47,10 @@ function sanitize(
     };
     if (Array.isArray(parsed.items)) {
       parsed.items = parsed.items.map((item) => {
-        const { chiramin: _chiramin, ...rest } = item;
-        void _chiramin;
-        return rest;
+        const nextItem: Record<string, unknown> = { ...item };
+        if ("chiramin" in nextItem) nextItem.chiramin = "";
+        if ("url" in nextItem) nextItem.url = "";
+        return nextItem;
       });
       return new TextEncoder().encode(JSON.stringify(parsed));
     }
