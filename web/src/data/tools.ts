@@ -40,22 +40,30 @@ export const TOOL_META: Record<ToolKey, ToolMeta> = {
   partners: { path: "/partners", icon: "/icons/play/partners.webp" },
 };
 
+export const IS_STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
+export const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(
+  /\/$/,
+  "",
+);
+
+export function assetPath(path: string): string {
+  return `${BASE_PATH}${path}`;
+}
+
 /** Desktop header links, in the original order. */
-export const HEADER_BAR_TOOLS: ToolKey[] = [
-  "sundome",
-  "shuttle",
-  "board",
-  "remote",
-  "story",
-];
+export const HEADER_BAR_TOOLS: ToolKey[] = (
+  ["sundome", "shuttle", "board", "remote", "story"] as ToolKey[]
+).filter((key) => !IS_STATIC_EXPORT || key !== "remote");
 
 /** Grouping used by the mobile menu and the home page. */
-export const NAV_SECTIONS: { key: NavSectionKey; tools: ToolKey[] }[] = [
-  { key: "solo", tools: ["sundome", "shuttle", "board"] },
-  { key: "partner", tools: ["remote", "remoteList"] },
-  { key: "read", tools: ["story"] },
-  { key: "measure", tools: ["streak", "size", "stamina", "partners"] },
-];
+export const NAV_SECTIONS: { key: NavSectionKey; tools: ToolKey[] }[] = (
+  [
+    { key: "solo", tools: ["sundome", "shuttle", "board"] },
+    { key: "partner", tools: ["remote", "remoteList"] },
+    { key: "read", tools: ["story"] },
+    { key: "measure", tools: ["streak", "size", "stamina", "partners"] },
+  ] as { key: NavSectionKey; tools: ToolKey[] }[]
+).filter((section) => !IS_STATIC_EXPORT || section.key !== "partner");
 
 /** Tools flagged with the NEW badge in the original UI. */
 export const NEW_TOOL_KEYS: ToolKey[] = ["shuttle", "board", "story"];

@@ -2,11 +2,17 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { StoryPlayer } from "@/components/tools/StoryPlayer";
-import { getStory } from "@/data/stories/server";
-import { isLocale } from "@/data/tools";
+import { getStory, storySlugs } from "@/data/stories/server";
+import { LOCALES, isLocale, type Locale } from "@/data/tools";
 
 interface PageProps {
   params: Promise<{ lang: string; slug: string }>;
+}
+
+export function generateStaticParams(): { lang: Locale; slug: string }[] {
+  return LOCALES.flatMap((lang) =>
+    storySlugs(lang).map((slug) => ({ lang, slug })),
+  );
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { getDictionary } from "@/data/i18n";
-import { LOCALES, isLocale, type Locale } from "@/data/tools";
+import { LOCALES, assetPath, isLocale, type Locale } from "@/data/tools";
 
 import "../globals.css";
 
@@ -70,13 +70,13 @@ export async function generateMetadata({
     title: dict.meta.title,
     description: dict.meta.description,
     applicationName: "100Adults",
-    manifest: "/manifest.json",
+    manifest: assetPath("/manifest.json"),
     icons: {
       icon: [
-        { url: "/favicon.ico", sizes: "any" },
-        { url: "/icons/icon.svg", type: "image/svg+xml" },
+        { url: assetPath("/favicon.ico"), sizes: "any" },
+        { url: assetPath("/icons/icon.svg"), type: "image/svg+xml" },
       ],
-      apple: [{ url: "/icons/icon-180.png", sizes: "180x180" }],
+      apple: [{ url: assetPath("/icons/icon-180.png"), sizes: "180x180" }],
     },
     robots: { index: true, follow: true },
     alternates: {
@@ -92,7 +92,7 @@ export async function generateMetadata({
       alternateLocale: lang === "zh" ? "en_US" : "zh_CN",
       images: [
         {
-          url: "/icons/icon-512.png",
+          url: assetPath("/icons/icon-512.png"),
           width: 512,
           height: 512,
           alt: dict.meta.ogAlt,
@@ -103,7 +103,7 @@ export async function generateMetadata({
       card: "summary",
       title: dict.meta.title,
       description: dict.meta.description,
-      images: ["/icons/icon-512.png"],
+      images: [assetPath("/icons/icon-512.png")],
     },
   };
 }

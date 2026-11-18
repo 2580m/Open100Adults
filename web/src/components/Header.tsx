@@ -9,6 +9,7 @@ import {
   HEADER_BAR_TOOLS,
   NAV_SECTIONS,
   TOOL_META,
+  assetPath,
   localePath,
   type Locale,
 } from "@/data/tools";
@@ -145,7 +146,7 @@ export function Header({ locale }: { locale: Locale }) {
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={meta.icon}
+                              src={assetPath(meta.icon)}
                               alt=""
                               width={36}
                               height={36}

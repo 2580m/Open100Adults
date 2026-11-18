@@ -9,6 +9,7 @@ import {
   NEW_TOOL_KEYS,
   TOOL_META,
   TOOL_VARIANTS,
+  assetPath,
   localePath,
   type HomeToolKey,
   type Locale,
@@ -40,7 +41,7 @@ function ToolRow({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={meta.icon}
+        src={assetPath(meta.icon)}
         alt=""
         width={40}
         height={40}
@@ -148,7 +149,7 @@ export default async function HomePage({ params }: PageProps) {
             <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={sundome.icon}
+                src={assetPath(sundome.icon)}
                 alt=""
                 width={52}
                 height={52}

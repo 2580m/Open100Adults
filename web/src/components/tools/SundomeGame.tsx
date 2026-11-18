@@ -11,7 +11,12 @@ import {
   type SundomeDifficulty,
   type SundomeEnding,
 } from "@/data/sundomeCopy";
-import { localePath, type Locale, type VariantKey } from "@/data/tools";
+import {
+  IS_STATIC_EXPORT,
+  localePath,
+  type Locale,
+  type VariantKey,
+} from "@/data/tools";
 
 type Phase =
   | "idle"
@@ -506,6 +511,7 @@ export function SundomeGame({
   });
 
   async function fetchSampleSource(source: SampleSource): Promise<SampleItem[]> {
+    if (IS_STATIC_EXPORT) return [];
     const response = await fetch(`/api/sundome-lab/${source}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = (await response.json()) as { items?: SampleItem[] };
@@ -515,6 +521,7 @@ export function SundomeGame({
   }
 
   async function loadSamples(source: SampleSource, allowFallback = false) {
+    if (IS_STATIC_EXPORT) return;
     setSampleSource(source);
     setSamplePage(0);
     setSamplesLoading(true);
@@ -546,6 +553,7 @@ export function SundomeGame({
   }
 
   async function openSamples() {
+    if (IS_STATIC_EXPORT) return;
     if (!accepted) {
       setGateOpen(true);
       return;
@@ -982,13 +990,15 @@ export function SundomeGame({
             >
               {copy.video.local}
             </button>
-            <button
-              type="button"
-              onClick={openSamples}
-              className="cursor-pointer rounded-lg border border-card-border px-3 py-1.5 text-xs font-bold text-foreground"
-            >
-              {copy.video.samples}
-            </button>
+            {!IS_STATIC_EXPORT ? (
+              <button
+                type="button"
+                onClick={openSamples}
+                className="cursor-pointer rounded-lg border border-card-border px-3 py-1.5 text-xs font-bold text-foreground"
+              >
+                {copy.video.samples}
+              </button>
+            ) : null}
             {videoUrl ? (
               <button
                 type="button"
@@ -1037,19 +1047,21 @@ export function SundomeGame({
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#ff4d6d]/30 bg-[#ff4d6d]/10 px-3 py-2 text-xs text-[#ff8399]">
                 <span>
                   {locale === "zh"
-                    ? "当前视频源无法播放（可能受地区 IP 限制）。"
-                    : "This video could not be played (it may be geo-blocked)."}
+                    ? "当前视频源无法播放（可能受地区或格式限制）。"
+                    : "This video could not be played (check format or network)."}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSamplesOpen(true);
-                    void loadSamples("alt-samples", false);
-                  }}
-                  className="cursor-pointer rounded-lg bg-accent px-2.5 py-1 text-[11px] font-bold text-white"
-                >
-                  {locale === "zh" ? "切换到备用源 (DUGA)" : "Switch to Alt source"}
-                </button>
+                {!IS_STATIC_EXPORT ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSamplesOpen(true);
+                      void loadSamples("alt-samples", false);
+                    }}
+                    className="cursor-pointer rounded-lg bg-accent px-2.5 py-1 text-[11px] font-bold text-white"
+                  >
+                    {locale === "zh" ? "切换到备用源 (DUGA)" : "Switch to Alt source"}
+                  </button>
+                ) : null}
               </div>
             ) : null}
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
@@ -1077,7 +1089,7 @@ export function SundomeGame({
           </div>
         ) : null}
 
-        {samplesOpen ? (
+        {!IS_STATIC_EXPORT && samplesOpen ? (
           <div className="mt-3 rounded-2xl border border-card-border bg-search-bg p-3">
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex gap-1 rounded-lg border border-card-border bg-background p-0.5">

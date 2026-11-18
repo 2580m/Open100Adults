@@ -5,13 +5,23 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { getDictionary } from "@/data/i18n";
+import { storyMeta } from "@/data/stories/meta";
 import { LOCALES, type Locale } from "@/data/tools";
 
 import { CheckIcon, GlobeIcon } from "./icons";
 
 const LOCALE_PREFIX = /^\/(en|zh)(?=\/|$)/;
+const STORY_ROUTE = /^\/(?:en|zh)\/story\/([^/]+)\/?$/;
+const STORY_SLUGS: Record<Locale, Set<string>> = {
+  en: new Set(storyMeta.en.map((item) => item.id)),
+  zh: new Set(storyMeta.zh.map((item) => item.id)),
+};
 
 function swapLocale(pathname: string, target: Locale): string {
+  const storyMatch = STORY_ROUTE.exec(pathname);
+  if (storyMatch && !STORY_SLUGS[target].has(storyMatch[1])) {
+    return `/${target}/story`;
+  }
   if (LOCALE_PREFIX.test(pathname)) {
     return pathname.replace(LOCALE_PREFIX, `/${target}`);
   }
