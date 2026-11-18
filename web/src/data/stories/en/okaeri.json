@@ -1,0 +1,171 @@
+{
+  "id": "okaeri",
+  "body": "m",
+  "tone": "sweet",
+  "title": "Welcome Home",
+  "blurb": "Another late night at work. You finally get the front door open, and your girlfriend, a few years older than you, waves you over from the couch. \"There you are. You worked hard today, so you get a reward. I'm going to make you feel good. Fast.\"",
+  "tags": [
+    "Older live-in girlfriend",
+    "Sweet",
+    "Short",
+    "Light edging",
+    "Guaranteed finish"
+  ],
+  "mins": 5,
+  "names": {
+    "m": "your girlfriend",
+    "n": "sweetheart"
+  },
+  "segs": [
+    {
+      "name": "On the couch",
+      "P": {
+        "c": "Sit back against the couch or the bed. Take your bottoms off and keep tissues, and lube if you have it, within reach.",
+        "d": 18,
+        "t": [
+          "Welcome home, {n}. Long day, huh?",
+          "You don't have to do a thing tonight. Just do what I tell you.",
+          "I'm going to make you feel good. Fast."
+        ]
+      }
+    },
+    {
+      "name": "Slow",
+      "bpm": 66,
+      "G": {
+        "c": "Hold it loosely and stroke slowly from base to tip, one stroke per beat.",
+        "d": 60,
+        "t": [
+          "Let your shoulders drop.",
+          "Let's make this the best part of your day.",
+          "That pace. Perfect.",
+          "Good boy.",
+          "If it gets too close, hit \"I'm close\" down below."
+        ]
+      },
+      "Y": {
+        "c": "Loosen your grip and keep stroking at half the speed.",
+        "d": 15,
+        "t": [
+          "Slowly.",
+          "Keep it loose."
+        ]
+      },
+      "R": {
+        "c": "Let go and take 2 deep breaths. If you start going soft, a few strokes to bring it back is fine.",
+        "d": 20,
+        "t": [
+          "Just a little break.",
+          "I'll let you cum soon."
+        ]
+      },
+      "X": {
+        "c": "Let go and take 3 deep breaths.",
+        "d": 25,
+        "t": [
+          "Already? You really needed this, huh.",
+          "Don't worry. You won't have to wait long.",
+          "Once it settles, we'll pick back up."
+        ]
+      }
+    },
+    {
+      "name": "The tip",
+      "bpm": 80,
+      "G": {
+        "c": "Wet the head with spit or lube and stroke mostly near the tip. If you're uncut, keep your foreskin over it.",
+        "d": 60,
+        "t": [
+          "You love it right there, don't you?",
+          "Get it nice and slippery.",
+          "Trying to stay quiet? That face is so cute.",
+          "Almost there.",
+          "Hit \"I'm close\" if you need to."
+        ]
+      },
+      "Y": {
+        "c": "Loosen your grip and keep stroking at half the speed.",
+        "d": 15,
+        "t": [
+          "Slowly.",
+          "Not yet."
+        ]
+      },
+      "R": {
+        "c": "Let go and take 2 deep breaths. If you've gone a little soft, a few strokes will bring it back.",
+        "d": 20,
+        "t": [
+          "Okay, break time.",
+          "And if it doesn't come all the way back, that's fine. Just keep going.",
+          "This next part is the last."
+        ]
+      },
+      "X": {
+        "c": "Let go and breathe deeply until it passes.",
+        "d": 30,
+        "t": [
+          "Right on the edge?",
+          "Let's wait for the wave to pass.",
+          "This next part is the last."
+        ]
+      }
+    }
+  ],
+  "finale": {
+    "build": {
+      "c": "Grip it the way that feels best and stroke to the beat. Keep going until {m} starts counting.",
+      "d": 25,
+      "bpm": 100,
+      "t": [
+        "Here we go.",
+        "I'll count down from 3. When I hit 0, that's your signal to cum."
+      ]
+    },
+    "judge": {
+      "type": "always"
+    },
+    "count": {
+      "from": 3,
+      "beat": 2.2,
+      "c": "She'll count down from 3. At 0, you're allowed to cum. Keep stroking until she says 0.",
+      "stalls": []
+    },
+    "allow": {
+      "c": "You can cum now. Keep stroking and let it all out. When you're done, hit \"I came\" below.",
+      "t": [
+        "Go ahead, {n}.",
+        "You did so well today.",
+        "Don't hold anything back."
+      ]
+    },
+    "after": {
+      "c": "Let go and take slow breaths.",
+      "d": 25,
+      "t": [
+        "Feel better?",
+        "I ran you a bath.",
+        "I'll go heat up dinner."
+      ]
+    }
+  },
+  "oops": {
+    "c": "Let go and take slow breaths.",
+    "t": [
+      "Oh. Did you cum already?",
+      "It's okay, it's okay. You were exhausted.",
+      "Your bath's ready whenever you are."
+    ]
+  },
+  "endings": {
+    "allow": {
+      "title": "Welcome Home",
+      "line": "You came right on {m}'s count, every last drop."
+    },
+    "oops": {
+      "title": "Couldn't Wait",
+      "line": "You came before {m} said you could.",
+      "near": "Just {left} more and you'd have heard \"go ahead.\""
+    }
+  },
+  "fill": []
+}

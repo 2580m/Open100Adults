@@ -1,0 +1,11 @@
+services:
+  open100adults:
+    image: ghcr.io/2580m/open100adults:latest
+    build: .
+    container_name: open100adults
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SITE_URL=http://localhost:3000

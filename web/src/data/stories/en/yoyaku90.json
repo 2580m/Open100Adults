@@ -1,0 +1,216 @@
+{
+  "id": "yoyaku90",
+  "body": "f",
+  "tone": "sweet",
+  "title": "Your First Booking",
+  "blurb": "You finally booked a session with a companion service for women. The woman who comes to your hotel room is a little older than you. She reads the note you left with your booking and smiles softly. \"Being touched still makes you nervous, right? Then today I'll just lie next to you and hold your hand. Only a little waiting. After that, come as many times as you like.\"",
+  "tags": [
+    "Companion for women",
+    "First booking",
+    "Holding hands in bed",
+    "Easy to come",
+    "Multiple orgasms (up to 3)"
+  ],
+  "mins": 8,
+  "names": {
+    "m": "your companion",
+    "n": "honey"
+  },
+  "segs": [
+    {
+      "name": "Right beside you",
+      "P": {
+        "c": "Put tissues within reach and lie on your back on the bed in your underwear. One hand at your side, the other on your belly.",
+        "d": 20,
+        "t": [
+          "Thank you for booking me. Nervous?",
+          "If anything doesn't feel right, we can stop anytime.",
+          "Today isn't about trying hard. It's about feeling good."
+        ]
+      }
+    },
+    {
+      "name": "Over your underwear",
+      "bpm": 62,
+      "G": {
+        "c": "Over your underwear, stroke slowly around your clit with two fingers, in time with the beat.",
+        "d": 60,
+        "t": [
+          "Yes, that speed.",
+          "Use whatever pressure feels nice.",
+          "Tell me later where it feels best. I want to remember.",
+          "Your shoulders are finally loosening up.",
+          "If you feel close, hit \"I'm close\" down below. We'll take a tiny break."
+        ]
+      },
+      "Y": {
+        "c": "Keep your fingers there and stroke at half speed.",
+        "d": 15,
+        "t": [
+          "Slowly.",
+          "Perfect."
+        ]
+      },
+      "R": {
+        "c": "Take your hand away and slip your underwear off.",
+        "d": 20,
+        "t": [
+          "A little break.",
+          "If you have lube, keep it within reach. If not, just lick your finger.",
+          "No more fabric from here."
+        ]
+      },
+      "X": {
+        "c": "Take your hand away and breathe slowly. Once you've settled, slip your underwear off.",
+        "d": 30,
+        "t": [
+          "Already close? I love that.",
+          "Not much more stopping, I promise.",
+          "Take them off once you've calmed down."
+        ]
+      }
+    },
+    {
+      "name": "Bare",
+      "bpm": 70,
+      "G": {
+        "c": "Wet a finger with spit, or lube if you have some. Draw small circles around your clit to the beat. Too much on top? Shift slightly to the side.",
+        "d": 65,
+        "t": [
+          "Need more slip? Wet your finger again anytime.",
+          "Is your finger gliding a little easier now?",
+          "Mm. You like it right there. Noted.",
+          "Squeeze my hand as hard as you want.",
+          "If you're at your limit, \"I'm close\"."
+        ]
+      },
+      "Y": {
+        "c": "Keep your finger there and circle at half speed.",
+        "d": 15,
+        "t": [
+          "Slowly.",
+          "Almost there."
+        ]
+      },
+      "R": {
+        "c": "Lift your finger away and take 2 deep breaths.",
+        "d": 18,
+        "t": [
+          "That's the last break.",
+          "After this one, I'm saying yes."
+        ]
+      },
+      "X": {
+        "c": "Lift your finger away and take 3 deep breaths.",
+        "d": 30,
+        "t": [
+          "Was that close? You stopped so well.",
+          "No more stopping after this.",
+          "Once you've settled, let's get you there."
+        ]
+      }
+    }
+  ],
+  "finale": {
+    "build": {
+      "c": "Touch yourself the way that feels best, in time with the beat. Keep going until {m} starts counting.",
+      "d": 40,
+      "bpm": 86,
+      "t": [
+        "Ready?",
+        "I'll count down from 3. At 0, you can come.",
+        "I've got your hand."
+      ]
+    },
+    "judge": {
+      "type": "always"
+    },
+    "count": {
+      "from": 3,
+      "beat": 2.3,
+      "c": "Now {m} counts down from 3. At 0, you can come. Until then, keep touching and wait.",
+      "stalls": []
+    },
+    "allow": {
+      "c": "Go ahead and come. Keep going. When you do, hit \"I came\" down below.",
+      "t": [
+        "Okay.",
+        "Don't hold back.",
+        "That's it, just like that."
+      ]
+    },
+    "rounds": [
+      {
+        "build": {
+          "c": "Take your hand away and rest, stroking your thighs. When the sensitivity fades, start slowly around your clit. Re-wet your finger if needed. If you come during this, hit \"I came\" right away.",
+          "d": 45,
+          "bpm": 68,
+          "t": [
+            "That's one. Well done.",
+            "We still have time. If you've got another in you, that is.",
+            "If that's plenty, just hit \"That's enough for now\"."
+          ]
+        },
+        "allow": {
+          "c": "Come again whenever you're ready. The beat's just a guide; touch however you like. Hit \"I came\" when you do, or \"That's enough for now\" to finish.",
+          "bpm": 92,
+          "t": [
+            "Number two.",
+            "Even if it doesn't happen, feeling good is plenty.",
+            "Go ahead."
+          ]
+        }
+      },
+      {
+        "build": {
+          "c": "Catch your breath. Cup your clit with two fingers and slowly press and release. Still sensitive? Press around it instead. If you come during this, hit \"I came\" right away.",
+          "d": 45,
+          "bpm": 72,
+          "t": [
+            "You're so warm.",
+            "Let's make this the last one.",
+            "If you get tired, stop anytime."
+          ]
+        },
+        "allow": {
+          "c": "One last time. Come whenever you're ready. Hit \"I came\" when you do, or \"That's enough for now\" to finish.",
+          "bpm": 96,
+          "t": [
+            "Number three.",
+            "That's it, keep going.",
+            "You did so well today."
+          ]
+        }
+      }
+    ],
+    "after": {
+      "c": "Take your hand away, stretch your legs out, and breathe slowly.",
+      "d": 30,
+      "t": [
+        "All done.",
+        "Here, have some water. Let's just lie here until our time's up.",
+        "Book me again, and we'll start with everything I learned about you today."
+      ]
+    }
+  },
+  "oops": {
+    "c": "Take your hand away and breathe slowly.",
+    "t": [
+      "Oh, did you get there?",
+      "That's fine. That's what today is for.",
+      "Let's just relax here until our time's up."
+    ]
+  },
+  "endings": {
+    "allow": {
+      "title": "Your First Booking",
+      "line": "You had {m} right beside you. Times you came: {times}."
+    },
+    "oops": {
+      "title": "Before the Yes",
+      "line": "You came before {m} said yes.",
+      "near": "You were {left} away from her yes."
+    }
+  },
+  "fill": []
+}

@@ -1,0 +1,25 @@
+{
+  "name": "open100adults-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Clean, reverse-engineered Next.js source for 100Adults (EN / 简体中文)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^16.2.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.14",
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.1.14",
+    "typescript": "^5.9.0"
+  }
+}
