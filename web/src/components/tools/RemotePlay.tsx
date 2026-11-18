@@ -36,6 +36,9 @@ export function RemotePlay({ locale }: { locale: Locale }) {
   const [lastCommand, setLastCommand] = useState<RoomCommand | null>(null);
   const [history, setHistory] = useState<RoomCommand[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [publicOrigin, setPublicOrigin] = useState<string | null>(null);
+  const [originSource, setOriginSource] = useState<"env" | "tunnel" | "local">("local");
+  const [tunnelPending, setTunnelPending] = useState(false);
 
   const lastSeqRef = useRef(0);
 
@@ -49,12 +52,56 @@ export function RemotePlay({ locale }: { locale: Locale }) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    let attempts = 0;
+    let timer = 0;
+
+    async function probePublicUrl() {
+      try {
+        const response = await fetch("/api/rgate/public-url", {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          origin?: string | null;
+          source?: "env" | "tunnel" | "none";
+          tunnelEnabled?: boolean;
+        };
+        if (cancelled) return;
+        if (data.origin) {
+          setPublicOrigin(data.origin);
+          setOriginSource(data.source === "env" ? "env" : "tunnel");
+          setTunnelPending(false);
+          return;
+        }
+        if (data.tunnelEnabled && attempts < 15) {
+          attempts += 1;
+          setTunnelPending(true);
+          timer = window.setTimeout(() => void probePublicUrl(), 2000);
+          return;
+        }
+        setTunnelPending(false);
+        setOriginSource("local");
+      } catch {
+        if (!cancelled) setTunnelPending(false);
+      }
+    }
+
+    void probePublicUrl();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
     if (roomCode && typeof window !== "undefined") {
+      const baseOrigin = publicOrigin || window.location.origin;
       setLink(
-        `${window.location.origin}${localePath(locale, "/sundome/remote")}?room=${roomCode}`,
+        `${baseOrigin}${localePath(locale, "/sundome/remote")}?room=${roomCode}`,
       );
     }
-  }, [roomCode, locale]);
+  }, [roomCode, locale, publicOrigin]);
 
   useEffect(() => {
     if (!ready || !roomCode || role !== "receiver") return;
@@ -101,8 +148,14 @@ export function RemotePlay({ locale }: { locale: Locale }) {
       const data = (await response.json()) as {
         ok?: boolean;
         room?: { code: string };
+        publicOrigin?: string | null;
       };
       if (data.ok && data.room) {
+        if (data.publicOrigin) {
+          setPublicOrigin(data.publicOrigin);
+          setOriginSource((prev) => (prev === "env" ? "env" : "tunnel"));
+          setTunnelPending(false);
+        }
         setRoomCode(data.room.code);
         setRole("controller");
       }
@@ -243,6 +296,33 @@ export function RemotePlay({ locale }: { locale: Locale }) {
         <p className="text-xs text-muted">
           {copy.controller.room}:{" "}
           <span className="font-mono font-bold text-foreground">{roomCode}</span>
+        </p>
+        <p className="mt-2 flex items-center gap-1.5 text-[11px]">
+          {publicOrigin ? (
+            <>
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[#6ee7a8]" />
+              <span className="text-[#6ee7a8]">
+                {locale === "zh"
+                  ? `公网联机链接已就绪（${originSource === "env" ? "自定义域名" : "Cloudflare 隧道"}，可直接发给对方）`
+                  : `Public link ready (${originSource === "env" ? "custom domain" : "Cloudflare Tunnel"})`}
+              </span>
+            </>
+          ) : tunnelPending ? (
+            <>
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[#e6b061]" />
+              <span className="text-[#e6b061]">
+                {locale === "zh"
+                  ? "正在建立 Cloudflare 公网隧道，稍后自动切换…"
+                  : "Starting Cloudflare Tunnel, switching link automatically…"}
+              </span>
+            </>
+          ) : (
+            <span className="text-muted">
+              {locale === "zh"
+                ? "当前为本地链接（仅本机 / 局域网可访问）"
+                : "Local link only (LAN / same device)"}
+            </span>
+          )}
         </p>
         <p className="mt-3 text-xs text-muted-strong">{copy.controller.linkReady}</p>
         <div className="mt-2 flex flex-wrap gap-2">

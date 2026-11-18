@@ -29,6 +29,72 @@ interface RouteContext {
   params: Promise<{ path: string[] }>;
 }
 
+const DISABLED_FLAGS = new Set(["false", "0", "no", "off"]);
+const ENABLED_FLAGS = new Set(["true", "1", "yes", "on"]);
+
+function isTunnelEnabled(): boolean {
+  const raw = (process.env.ENABLE_TUNNEL ?? "").trim().toLowerCase();
+  if (DISABLED_FLAGS.has(raw)) return false;
+  if (ENABLED_FLAGS.has(raw)) return true;
+  return Boolean(
+    process.env.CLOUDFLARED_METRICS_URL || process.env.CLOUDFLARED_METRICS_PORT,
+  );
+}
+
+function normalizeOrigin(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const withScheme = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  try {
+    const parsed = new URL(withScheme);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+async function resolvePublicOrigin(): Promise<{
+  origin: string | null;
+  source: "env" | "tunnel" | "none";
+  tunnelEnabled: boolean;
+}> {
+  const tunnelEnabled = isTunnelEnabled();
+  const envOrigin = process.env.PUBLIC_SHARE_URL
+    ? normalizeOrigin(process.env.PUBLIC_SHARE_URL)
+    : null;
+  if (envOrigin) {
+    return { origin: envOrigin, source: "env", tunnelEnabled };
+  }
+  if (!tunnelEnabled) {
+    return { origin: null, source: "none", tunnelEnabled: false };
+  }
+
+  const metricsUrl =
+    process.env.CLOUDFLARED_METRICS_URL ||
+    `http://127.0.0.1:${process.env.CLOUDFLARED_METRICS_PORT || "20241"}/quicktunnel`;
+  try {
+    const response = await fetch(metricsUrl, {
+      signal: AbortSignal.timeout(1500),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return { origin: null, source: "none", tunnelEnabled: true };
+    }
+    const data = (await response.json()) as { hostname?: unknown };
+    const origin =
+      typeof data.hostname === "string" ? normalizeOrigin(data.hostname) : null;
+    if (origin) {
+      return { origin, source: "tunnel", tunnelEnabled: true };
+    }
+  } catch {
+    // Tunnel metrics endpoint not ready or unreachable.
+  }
+  return { origin: null, source: "none", tunnelEnabled: true };
+}
+
 function makeCode(): string {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
@@ -57,6 +123,10 @@ async function readJson(request: NextRequest): Promise<Record<string, unknown>> 
 export async function GET(request: NextRequest, context: RouteContext) {
   const { path } = await context.params;
   const [root, code, leaf] = path;
+
+  if (root === "public-url") {
+    return NextResponse.json({ ok: true, ...(await resolvePublicOrigin()) });
+  }
 
   if (root !== "rooms") {
     return NextResponse.json({ ok: true, rooms: [], localMock: true });
@@ -114,7 +184,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       if (oldestCode !== undefined) rooms.delete(oldestCode);
     }
     rooms.set(nextCode, room);
-    return NextResponse.json({ ok: true, room: roomSummary(room) });
+    const { origin } = await resolvePublicOrigin();
+    return NextResponse.json({
+      ok: true,
+      room: roomSummary(room),
+      publicOrigin: origin,
+    });
   }
 
   const room = rooms.get(code.toUpperCase());
