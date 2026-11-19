@@ -26,9 +26,9 @@
 - **纯净无广告**：彻底移除 GTM、Cloudflare Insights、HilltopAds、Bance、TrafficStars、FAM、Arrow 及所有姊妹站 / 外链推广组件；视频代理响应也会主动清洗推广字段。
 - **双语精简切换**：仅保留 **English (`/en`)** 与 **简体中文 (`/zh`)**，跨语言缺失的专属剧情会自动平滑回退到列表页，避免 404。
 - **双模式架构与分支说明**：
-  - **`pages` 分支（GitHub Pages）**：自动导出所有 100% 前端可独立运行的工具（寸止游戏 + 本地视频、双人时钟同步 `/sundome/p`、折返跑、飞行棋、全部 142 篇互动剧情、戒色计数器、三个百分位计算器），无需任何后端即可在线使用。
-  - **`dev` 分支（Route B 全动态源码版）**：基于 `Next.js 16 + custom-server.mjs + ws`，提供真实 `/rws` WebSocket 双向房间联机、围观排队、全屏播放器、`<SundomeArc>` 曲线复盘、内置 `cloudflared` 公网单链接联机，以及语音/试看片代理接口（镜像标签：`ghcr.io/2580m/open100adults:dev`）。
-  - **`main` 分支（Route A 发布版）**：稳定发布归档版本。
+  - **`main` 分支（默认正式版 · Route B 全动态源码版）**：基于 `Next.js 16 + custom-server.mjs + ws`，提供真实 `/rws` WebSocket 双向房间联机、围观排队、全屏播放器、`<SundomeArc>` 曲线复盘、内置 `cloudflared` 公网单链接联机，以及语音/试看片代理接口（镜像标签：`ghcr.io/2580m/open100adults:latest` / `main`）。
+  - **`dev` 分支（开发预览版）**：功能迭代与预发布验证分支（镜像标签：`ghcr.io/2580m/open100adults:dev`）。
+  - **`pages` 分支（GitHub Pages 纯静态版）**：当 `main` 的 `web/**` 更新时自动导出所有 100% 前端可独立运行的工具（寸止游戏 + 本地视频、双人时钟同步 `/sundome/p`、折返跑、飞行棋、全部 142 篇互动剧情、戒色计数器、三个百分位计算器），无需后端即可在线使用。
 - **本地优先隐私保护**：所有打卡、游戏配置、自定义指令与最佳纪录均保存在浏览器 `localStorage` / `sessionStorage`，不上传用户数据；字体与图标均已本地化。
 - **浏览器端交互引擎**：内置 Web Audio API 实时节拍器与合成音、SpeechSynthesis 语音指令播报、3D 骰子物理动画及统计分布模型。
 

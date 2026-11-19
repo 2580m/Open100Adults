@@ -3,9 +3,13 @@ name: Build & Publish Docker Image
 on:
   push:
     branches:
+      - main
       - dev
+    tags:
+      - "v*.*.*"
   pull_request:
     branches:
+      - main
       - dev
   workflow_dispatch: {}
 
@@ -98,7 +102,10 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=ref,event=branch
-            type=sha,prefix=dev-sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6

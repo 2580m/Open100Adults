@@ -41,11 +41,19 @@ function moveDir(from, to) {
 }
 
 let moved = [];
+let buildStatus = 0;
 try {
   fs.rmSync(backupDir, { recursive: true, force: true });
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.rmSync(path.join(webDir, ".next", "types"), {
     recursive: true,
+    force: true,
+  });
+  fs.rmSync(path.join(webDir, ".next", "dev"), {
+    recursive: true,
+    force: true,
+  });
+  fs.rmSync(path.join(webDir, "tsconfig.tsbuildinfo"), {
     force: true,
   });
 
@@ -69,9 +77,7 @@ try {
     },
   });
 
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
+  buildStatus = result.status ?? 1;
 } finally {
   for (const entry of moved.reverse()) {
     if (fs.existsSync(entry.dst)) {
@@ -80,6 +86,10 @@ try {
     }
   }
   fs.rmSync(backupDir, { recursive: true, force: true });
+}
+
+if (buildStatus !== 0) {
+  process.exit(buildStatus);
 }
 
 // 1. Disable Jekyll on GitHub Pages so _next/ assets are served properly.

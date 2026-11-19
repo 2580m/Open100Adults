@@ -1,6 +1,12 @@
 name: Sync GitHub Pages Branch
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "web/**"
+      - ".github/workflows/sync-pages.yml"
   workflow_dispatch: {}
 
 concurrency:

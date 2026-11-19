@@ -1,6 +1,6 @@
-# Route B Architecture & Parity Checklist (`dev` Branch)
+# Route B Architecture & Parity Checklist
 
-> **Status: IMPLEMENTED ON `dev`** — 100% Dynamic Source-Code Architecture (`Next.js 16 + custom-server.mjs + /rws WebSocket + cloudflared`), with `main` (`v1.0.1` Route A) preserved untouched.
+> **Status: RELEASED ON `main`** — 100% Dynamic Source-Code Architecture (`Next.js 16 + custom-server.mjs + /rws WebSocket + cloudflared`), with `v1.0.0` / `v1.0.1` preserved in git tags.
 
 ## Completed Milestones
 
