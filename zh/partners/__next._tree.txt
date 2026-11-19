@@ -1,0 +1,8 @@
+:HL["/Open100Adults/_next/static/chunks/3kd_q_p3mzzex.css","style"]
+:HL["/Open100Adults/_next/static/media/geist_latin-s.p.0wgildi0cnwt9.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/Open100Adults/_next/static/media/instrument_serif_italic-s.p.3j3877k49yy0l.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/Open100Adults/_next/static/media/instrument_serif_regular-s.p.1g73gv09-xcb6.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+3:[["children",{"s":"__PAGE__","h":160}]]
+2:[["children",{"s":"partners","h":96,"c":"$Q3"}]]
+1:[["children",{"s":{"n":"lang","t":"d","k":"zh","s":[]},"h":112,"c":"$Q2"}]]
+0:{"b":"bhNyxzWmTsp2U7Z1uYjYg","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
