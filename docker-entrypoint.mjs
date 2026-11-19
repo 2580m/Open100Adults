@@ -10,7 +10,7 @@ function isDisabled(value) {
   return DISABLED_FLAGS.has(String(value ?? "").trim().toLowerCase());
 }
 
-const server = spawn(process.execPath, ["server.mjs"], {
+const server = spawn(process.execPath, ["custom-server.mjs"], {
   stdio: "inherit",
   env: process.env,
 });

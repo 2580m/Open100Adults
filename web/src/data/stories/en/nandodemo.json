@@ -1,0 +1,258 @@
+{
+  "id": "nandodemo",
+  "body": "f",
+  "tone": "sweet",
+  "title": "As Many As You Want",
+  "blurb": "A month apart, and now you're finally back at his place. You sit side by side on his bed, and he runs his fingers through your hair. \"No holding back tonight. I'm going to make you come as many times as you want.\"",
+  "tags": [
+    "Older boyfriend",
+    "Sweet",
+    "Doting",
+    "Multiple orgasms (up to 5)",
+    "Light on edging"
+  ],
+  "mins": 10,
+  "names": {
+    "m": "your boyfriend",
+    "n": "sweetheart"
+  },
+  "segs": [
+    {
+      "name": "Next to him",
+      "P": {
+        "c": "Put tissues within reach. Lie back on the bed, or sit up against a pillow. Strip down to your underwear and rest your hands on your belly.",
+        "d": 20,
+        "t": [
+          "God, I missed you, {n}.",
+          "Only a little teasing tonight. I promise.",
+          "If you've got lube, keep it close."
+        ]
+      }
+    },
+    {
+      "name": "Over your underwear",
+      "bpm": 60,
+      "G": {
+        "c": "Over your underwear, stroke slowly around your clit with two fingers, in time with the beat.",
+        "d": 60,
+        "t": [
+          "Nice and slow.",
+          "It's been a whole month. Heart racing?",
+          "That speed. Perfect.",
+          "If it feels good, just stay there.",
+          "If it gets to be too much, hit \"I'm close\" down below."
+        ]
+      },
+      "Y": {
+        "c": "Keep your fingers there and stroke at half the speed.",
+        "d": 15,
+        "t": [
+          "Slower.",
+          "You're adorable."
+        ]
+      },
+      "R": {
+        "c": "Take your hand away and slip your underwear off.",
+        "d": 20,
+        "t": [
+          "Go ahead, take them off.",
+          "No more fabric in the way.",
+          "Get comfortable. Let your legs relax."
+        ]
+      },
+      "X": {
+        "c": "Take your hand away and breathe slowly. Once you've settled, slip your underwear off.",
+        "d": 30,
+        "t": [
+          "Already? I love that.",
+          "It's okay. You're going to come plenty tonight.",
+          "Take them off whenever you're ready."
+        ]
+      }
+    },
+    {
+      "name": "Skin to skin",
+      "bpm": 70,
+      "G": {
+        "c": "Wet your fingers with spit, or lube if you have it, and stroke up from your entrance to your clit, in time with the beat.",
+        "d": 65,
+        "t": [
+          "Get as slippery as you like.",
+          "Bottom to top. Slowly.",
+          "If your hips start moving, let them.",
+          "You're beautiful, {n}.",
+          "Getting close? Hit \"I'm close\"."
+        ]
+      },
+      "Y": {
+        "c": "Keep your fingers there and stroke at half the speed.",
+        "d": 15,
+        "t": [
+          "Slower.",
+          "Not yet. Almost."
+        ]
+      },
+      "R": {
+        "c": "Take your fingers away and breathe deep, twice.",
+        "d": 18,
+        "t": [
+          "Just a little break.",
+          "Your first one is coming up soon."
+        ]
+      },
+      "X": {
+        "c": "Take your fingers away and breathe deep, three times.",
+        "d": 30,
+        "t": [
+          "That close? You stopped right in time.",
+          "I'll let you come very soon.",
+          "Stay right there until you've calmed down."
+        ]
+      }
+    }
+  ],
+  "finale": {
+    "build": {
+      "c": "With the pad of your middle finger, draw small circles on your clit in time with the beat. If it's too sensitive, circle around it instead. Keep going until {m} starts counting.",
+      "d": 40,
+      "bpm": 90,
+      "t": [
+        "Let's get you your first one.",
+        "I'll count down from 3. When I hit 0, you can come.",
+        "Here we go."
+      ]
+    },
+    "judge": {
+      "type": "always"
+    },
+    "count": {
+      "from": 3,
+      "beat": 2.4,
+      "c": "Now {m} is counting down from 3. At 0, you can come. Keep touching yourself and wait for it.",
+      "stalls": []
+    },
+    "allow": {
+      "c": "You can come now. Keep going. When you do, hit \"I came\" down below.",
+      "t": [
+        "Go ahead, {n}.",
+        "Let your body go loose.",
+        "Take as long as you need. I'm right here."
+      ]
+    },
+    "rounds": [
+      {
+        "build": {
+          "c": "Take your hand away for a bit and stroke your thighs while you rest. When you're ready, start again slowly around your clit. If you come along the way, hit \"I came\" right away.",
+          "d": 45,
+          "bpm": 70,
+          "t": [
+            "There's one.",
+            "If that's all you want tonight, \"That's enough for now\" is fine.",
+            "It's fine if another one doesn't come. Just enjoy how it feels."
+          ]
+        },
+        "allow": {
+          "c": "You can come again. The beat's just a guide; touch however you like. Hit \"I came\" when you do, or \"That's enough for now\" if you're done.",
+          "bpm": 96,
+          "t": [
+            "Number two.",
+            "No rush.",
+            "As many as you want."
+          ]
+        }
+      },
+      {
+        "build": {
+          "c": "Catch your breath. Rest a finger at your entrance, slip it in a little if that's easy, and stroke your clit with your thumb. Rather not go in? Just press there. If it hurts, stop. If you come along the way, hit \"I came\" right away.",
+          "d": 45,
+          "bpm": 72,
+          "t": [
+            "You're all warm now.",
+            "You don't have to try. Just do what feels good.",
+            "If it builds again, let it."
+          ]
+        },
+        "allow": {
+          "c": "You can come a third time. Hit \"I came\" when you do, or \"That's enough for now\" if you're done.",
+          "bpm": 100,
+          "t": [
+            "Number three.",
+            "Take your time.",
+            "That's it."
+          ]
+        }
+      },
+      {
+        "build": {
+          "c": "Stretch your legs out and rub your clit with two fingers in time with the beat. If it's too sensitive, stay around it. Rest whenever you need to. If you come along the way, hit \"I came\" right away.",
+          "d": 45,
+          "bpm": 80,
+          "t": [
+            "Still with me?",
+            "Whenever you want to stop, \"That's enough for now\" is right there.",
+            "If it's getting to be a lot, take little breaks."
+          ]
+        },
+        "allow": {
+          "c": "You can come a fourth time. Hit \"I came\" when you do, or \"That's enough for now\" if you're done.",
+          "bpm": 104,
+          "t": [
+            "Number four.",
+            "Your body's moving all on its own.",
+            "Good. Just like that."
+          ]
+        }
+      },
+      {
+        "build": {
+          "c": "Touch yourself whatever way feels best. The beat's just a guide; go at your own speed. If you come along the way, hit \"I came\" right away.",
+          "d": 45,
+          "bpm": 88,
+          "t": [
+            "Let's make this the last one.",
+            "Look how far you've come. Amazing.",
+            "Feel good all the way to the end."
+          ]
+        },
+        "allow": {
+          "c": "One last time. You can come. Hit \"I came\" when you do, or \"That's enough for now\" if you're done.",
+          "bpm": 110,
+          "t": [
+            "Number five.",
+            "Go on, {n}.",
+            "I love you."
+          ]
+        }
+      }
+    ],
+    "after": {
+      "c": "Take your hand away, stretch your legs out, and breathe slowly.",
+      "d": 30,
+      "t": [
+        "You did so well.",
+        "Drink some water, okay?",
+        "Stay. Sleep here with me tonight."
+      ]
+    }
+  },
+  "oops": {
+    "c": "Take your hand away and breathe slowly.",
+    "t": [
+      "Oh, you already came?",
+      "It's okay. I'm not mad.",
+      "Next time, though, wait for me."
+    ]
+  },
+  "endings": {
+    "allow": {
+      "title": "As Many As You Want",
+      "line": "Times {m} made you come tonight: {times}."
+    },
+    "oops": {
+      "title": "Couldn't Wait",
+      "line": "You came before {m} said you could.",
+      "near": "Just {left} more and you'd have heard \"go ahead.\""
+    }
+  },
+  "fill": []
+}

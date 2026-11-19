@@ -1,6 +1,6 @@
 services:
   open100adults:
-    image: ghcr.io/2580m/open100adults:latest
+    image: ghcr.io/2580m/open100adults:dev
     build: .
     container_name: open100adults
     restart: unless-stopped
@@ -10,11 +10,10 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
-      # Built-in Cloudflare Tunnel is enabled by default so visiting 127.0.0.1:3000
-      # or a LAN IP generates a public remote-play link. Set to "false" to disable.
+      - NEXT_PUBLIC_SITE_URL=http://localhost:3000
+      # Built-in Cloudflare Tunnel is enabled by default so local 127.0.0.1:3000
+      # can generate a public remote-play link. Set to "false" to disable.
       - ENABLE_TUNNEL=${ENABLE_TUNNEL:-true}
       # Optional: use your own fixed domain or Named Tunnel token
       # - PUBLIC_SHARE_URL=https://play.yourdomain.com
       # - CLOUDFLARED_TOKEN=your-tunnel-token
-    volumes:
-      - ./data:/app/data

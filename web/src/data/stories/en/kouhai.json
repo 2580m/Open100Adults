@@ -1,0 +1,563 @@
+{
+  "id": "kouhai",
+  "body": "f",
+  "tone": "tease",
+  "title": "His Plan Tonight",
+  "blurb": "Three months together. He's two years behind you on the same team, and you're the one who taught him the job from day one. But tonight he dims the lights and says, \"Tonight I'm running things. Please just do what I tell you. And if anything feels wrong, tell me right away.\"",
+  "tags": [
+    "Younger coworker",
+    "Polite the whole way",
+    "Calmly takes the lead",
+    "Long (20+ min)",
+    "Your edges decide the ending"
+  ],
+  "mins": 21,
+  "names": {
+    "m": "your protégé",
+    "n": "boss"
+  },
+  "marks": {
+    "name": "Edges",
+    "allow": 3,
+    "ruin": 1
+  },
+  "segs": [
+    {
+      "name": "The plan",
+      "P": {
+        "c": "Please put tissues within reach and sit on the edge of the bed, still dressed. Hands on your knees. No touching yet, please.",
+        "d": 24,
+        "t": [
+          "At work, you're always the one who plans everything, {n}.",
+          "Tonight it's the other way around. I won't rush you, and nothing you don't want.",
+          "If you want to stop, \"Quit\" up top ends it any time.",
+          "If it gets too close, please hit \"I'm close\" down below, and we'll stop there. Stop three times, and at the end I'll count you down."
+        ]
+      }
+    },
+    {
+      "name": "Your neck",
+      "bpm": 52,
+      "G": {
+        "c": "Please stroke slowly down with your fingertips, from under your ear, along your neck, to your collarbone, in time with the beat.",
+        "d": 65,
+        "t": [
+          "Your shoulders are up. Please let them drop.",
+          "Your neck is sensitive, isn't it? I already knew.",
+          "That speed. Please don't go faster.",
+          "You touch your neck a lot in meetings. I've noticed for a long time.",
+          "We're only just getting started."
+        ]
+      },
+      "Y": {
+        "c": "Please keep your fingertips there and stroke down at half the speed.",
+        "d": 16,
+        "t": [
+          "Slowly.",
+          "Not yet."
+        ]
+      },
+      "R": {
+        "c": "Please take your hand away and put it back on your knee.",
+        "d": 22,
+        "t": [
+          "Okay, let's pause there.",
+          "Not enough? Good. That's the idea.",
+          "I'll work my way lower, a little at a time."
+        ]
+      },
+      "X": {
+        "c": "Please take your hand away right now and put it back on your knee. Breathe slowly until it fades.",
+        "d": 34,
+        "t": [
+          "Just from your neck?",
+          "You stopped. Well done.",
+          "I'll wait until you've settled. We have time."
+        ]
+      }
+    },
+    {
+      "name": "Inner thighs",
+      "bpm": 56,
+      "G": {
+        "c": "Over your clothes, please stroke up your inner thigh with your fingertips, from the knee to just short of the top, in time with the beat. Please don't touch the very top.",
+        "d": 70,
+        "t": [
+          "Stop just before the top and go back to your knee. Yes, like that.",
+          "You want to close your legs, don't you?",
+          "You can. I'll just wait until you want to open them again.",
+          "You're the one who taught me this. Prep is eighty percent of the work.",
+          "At your limit, please hit \"I'm close\"."
+        ]
+      },
+      "Y": {
+        "c": "Please keep your fingertips there and stroke up at half the speed.",
+        "d": 16,
+        "t": [
+          "Slowly.",
+          "Not yet."
+        ]
+      },
+      "R": {
+        "c": "Please take your hand away and rest both hands on your knees.",
+        "d": 22,
+        "t": [
+          "Stop.",
+          "You look nothing like you do at the office.",
+          "Please wait just like that for a moment."
+        ]
+      },
+      "X": {
+        "c": "Please take your hand away and rest both hands on your knees. Let your legs relax and wait for it to fade.",
+        "d": 34,
+        "t": [
+          "And that was over your clothes.",
+          "You stopped. Nicely done.",
+          "We'll go on once you've caught your breath."
+        ]
+      }
+    },
+    {
+      "name": "Under your top",
+      "bpm": 60,
+      "G": {
+        "c": "Please slip one hand up under your top, cup your breast over your bra, and stroke around your nipple with your thumb, in time with the beat. If it doesn't feel like much, just stroke around it.",
+        "d": 70,
+        "t": [
+          "Over the bra. Not bare. Not yet.",
+          "Just one side is fine.",
+          "Your breathing's gotten a little shallow.",
+          "Are you keeping to the beat?",
+          "Nothing down below, please. Only your chest."
+        ]
+      },
+      "Y": {
+        "c": "Please keep your hand where it is and stroke at half the speed.",
+        "d": 16,
+        "t": [
+          "Slowly.",
+          "Stay there."
+        ]
+      },
+      "R": {
+        "c": "Please take your hand out from under your top and rest both hands on your knees.",
+        "d": 22,
+        "t": [
+          "Hand out, please.",
+          "Your hands look restless.",
+          "Let's have you lie down."
+        ]
+      },
+      "X": {
+        "c": "Please take your hand out from under your top and rest both hands on your knees. Relax your shoulders and wait.",
+        "d": 34,
+        "t": [
+          "You got that close just from your chest?",
+          "But you stopped.",
+          "It's okay. I'm right here until you've settled."
+        ]
+      }
+    },
+    {
+      "name": "Lie down",
+      "P": {
+        "c": "Please lie on your back in bed and strip down to your underwear. Hands at your sides.",
+        "d": 20,
+        "t": [
+          "Take your time. No rush.",
+          "You don't have to fold your clothes. I know you, {n}. You always do.",
+          "From here, I'm coming a little closer."
+        ]
+      }
+    },
+    {
+      "name": "Just press",
+      "bpm": 64,
+      "G": {
+        "c": "Over your underwear, please rest two fingers on your clit and press lightly in time with the beat. No rubbing. Just press and let go.",
+        "d": 70,
+        "t": [
+          "No rubbing, please. Just pressing.",
+          "Not quite enough is exactly right.",
+          "Your hips are lifting.",
+          "Keep your breathing quiet, please. The walls aren't that thick.",
+          "If it's too close, \"I'm close\"."
+        ]
+      },
+      "Y": {
+        "c": "Please keep your fingers there and press at half the speed.",
+        "d": 16,
+        "t": [
+          "Slowly.",
+          "Not yet."
+        ]
+      },
+      "R": {
+        "c": "Please take your fingers away and rest both hands at your sides.",
+        "d": 22,
+        "t": [
+          "Okay, let go, please.",
+          "You get greedy fast at times like this, {n}.",
+          "But we're only halfway through the plan."
+        ]
+      },
+      "X": {
+        "c": "Please take your fingers away and rest both hands at your sides. Stay still until it fades.",
+        "d": 35,
+        "t": [
+          "I only had you pressing.",
+          "And you can still wait right here. Good.",
+          "Breathe slowly, please."
+        ]
+      }
+    },
+    {
+      "name": "Over your underwear",
+      "bpm": 68,
+      "G": {
+        "c": "Over your underwear, please stroke up and down over your clit with your middle finger, in time with the beat.",
+        "d": 72,
+        "t": [
+          "Now you can stroke. Finally.",
+          "Over the fabric. Not underneath yet.",
+          "Can you feel how warm it is, even through the fabric?",
+          "Your hips keep pulling away. They don't have to.",
+          "At your limit, \"I'm close\". I'll stop you."
+        ]
+      },
+      "Y": {
+        "c": "Please keep your finger there and stroke at half the speed.",
+        "d": 16,
+        "t": [
+          "Slowly.",
+          "Stay there."
+        ]
+      },
+      "R": {
+        "c": "Please take your hand away and stretch your legs out.",
+        "d": 22,
+        "t": [
+          "Stop. You're doing exactly as you're told.",
+          "If you're feeling sensitive, you can just touch around it from here on.",
+          "Let's get you ready to take those off."
+        ]
+      },
+      "X": {
+        "c": "Please take your hand away and stretch your legs out. Breathe deeply until it fades.",
+        "d": 35,
+        "t": [
+          "That one was close, wasn't it?",
+          "You stopped very well.",
+          "Don't rush. I'll get you all the way there, properly."
+        ]
+      }
+    },
+    {
+      "name": "Off",
+      "P": {
+        "c": "Please take off your underwear, bend your knees, and part your legs a little. If bent knees get tiring, you can keep your legs straight.",
+        "d": 20,
+        "t": [
+          "No hurry.",
+          "Embarrassed? It's dark. It's okay.",
+          "From here, you can touch yourself directly."
+        ]
+      }
+    },
+    {
+      "name": "From your entrance",
+      "bpm": 72,
+      "G": {
+        "c": "Please wet your finger with spit, or lube if you have it, and stroke slowly up from your entrance to your clit, in time with the beat.",
+        "d": 72,
+        "t": [
+          "Bottom to top. Slowly.",
+          "Don't stay on your clit, please. Back down to your entrance.",
+          "Is your finger gliding more easily now?",
+          "You're keeping your breathing quiet. Good.",
+          "If it gets too close, please hit \"I'm close\" right away."
+        ]
+      },
+      "Y": {
+        "c": "Please keep your finger there and stroke up at half the speed.",
+        "d": 16,
+        "t": [
+          "Slowly.",
+          "Not yet."
+        ]
+      },
+      "R": {
+        "c": "Please take your finger away and rest both hands at your sides.",
+        "d": 22,
+        "t": [
+          "Okay, break time.",
+          "You actually love being teased, don't you?",
+          "Please wait just like that."
+        ]
+      },
+      "X": {
+        "c": "Please take your finger away and rest both hands at your sides. Stretch your legs out and wait for it to fade.",
+        "d": 36,
+        "t": [
+          "That was right on the edge.",
+          "If you held through that, you'll be fine.",
+          "We'll pick it up again once you've settled."
+        ]
+      }
+    },
+    {
+      "name": "Only around it",
+      "bpm": 76,
+      "G": {
+        "c": "Please wet one finger with spit, or lube if you have it, and trace slow circles around your clit in time with the beat. Please don't touch the center.",
+        "d": 72,
+        "t": [
+          "Only around it. The center comes later.",
+          "Almost touching, but not. Right there.",
+          "Your hips are chasing your finger.",
+          "Funny. You're usually the one telling me to wait, {n}.",
+          "At your limit, \"I'm close\"."
+        ]
+      },
+      "Y": {
+        "c": "Please slow the circles to half the speed.",
+        "d": 16,
+        "t": [
+          "Slowly.",
+          "Stay there."
+        ]
+      },
+      "R": {
+        "c": "Please take your finger away and rest it on your thigh.",
+        "d": 22,
+        "t": [
+          "Stop, please.",
+          "You're not touching, and you can still feel it, can't you?",
+          "The center comes when I say so."
+        ]
+      },
+      "X": {
+        "c": "Please take your finger away and rest it on your thigh. Stay still until it fades.",
+        "d": 36,
+        "t": [
+          "And you didn't even touch the center.",
+          "Your finger's off. Good.",
+          "I'll wait until your breathing comes back."
+        ]
+      }
+    },
+    {
+      "name": "The center",
+      "bpm": 80,
+      "G": {
+        "c": "Please rest the pad of your middle finger on your clit and draw one small circle per beat. If it's too sensitive, circle around it instead.",
+        "d": 72,
+        "t": [
+          "The center, at last.",
+          "Small. You don't need to press hard.",
+          "Please keep to that speed.",
+          "Even in the dark, I can tell you're blushing.",
+          "If you're about to come, please hit \"I'm close\" right away."
+        ]
+      },
+      "Y": {
+        "c": "Please slow the circles to half the speed.",
+        "d": 16,
+        "t": [
+          "Slowly.",
+          "Not yet."
+        ]
+      },
+      "R": {
+        "c": "Please take your finger away and rest both hands at your sides.",
+        "d": 22,
+        "t": [
+          "We'll stop there.",
+          "Stopping at this point is impressive.",
+          "Please hang in there a few more times."
+        ]
+      },
+      "X": {
+        "c": "Please take your finger away and rest both hands at your sides. Let your legs relax and wait for it to fade.",
+        "d": 37,
+        "t": [
+          "Was that close?",
+          "You stopped. You always do things by the book, {n}.",
+          "We'll go on once you've settled."
+        ]
+      }
+    },
+    {
+      "name": "Inside and out",
+      "bpm": 86,
+      "G": {
+        "c": "Please slowly slide your middle finger inside and rest your thumb on your clit. Move your finger in and out, just a little, with the beat. If you don't like going inside, just press at the entrance. If it hurts, please stop.",
+        "d": 75,
+        "t": [
+          "No need to go deep. Stay near the entrance.",
+          "Keep your thumb on your clit.",
+          "Can you feel yourself tightening?",
+          "You can cover your mouth with your hand if you need to.",
+          "At your limit, \"I'm close\", right away."
+        ]
+      },
+      "Y": {
+        "c": "Please keep your fingers where they are and move at half the speed.",
+        "d": 16,
+        "t": [
+          "Slowly.",
+          "Stay there."
+        ]
+      },
+      "R": {
+        "c": "If your finger is inside, please slide it out slowly. Then rest both hands at your sides.",
+        "d": 22,
+        "t": [
+          "No need to hurry. Slowly.",
+          "You've done every single thing I asked.",
+          "Almost there."
+        ]
+      },
+      "X": {
+        "c": "If your finger is inside, please slide it out slowly. Rest both hands at your sides, stretch your legs out, and wait for it to fade.",
+        "d": 37,
+        "t": [
+          "That one was really right on the edge, wasn't it?",
+          "And you still let go. That's you.",
+          "It's okay. I'm watching you all the way to the end."
+        ]
+      }
+    },
+    {
+      "name": "A little faster",
+      "bpm": 96,
+      "G": {
+        "c": "Please rub your clit with two fingers, a little faster now, in time with the beat. If it's too much, rub around it instead.",
+        "d": 70,
+        "t": [
+          "It gets a little faster from here.",
+          "Your hips can move. Just keep your breathing quiet.",
+          "Will you be able to look me in the face at work on Monday, {n}?",
+          "Want to come? Not yet.",
+          "If it's too close, stop with \"I'm close\"."
+        ]
+      },
+      "Y": {
+        "c": "Please keep your fingers there and go at half the speed.",
+        "d": 15,
+        "t": [
+          "Slowly.",
+          "Not yet."
+        ]
+      },
+      "R": {
+        "c": "Please take your fingers away and breathe deeply, three times.",
+        "d": 22,
+        "t": [
+          "You've worked so hard.",
+          "If you're feeling sensitive, you can just touch around it at the end.",
+          "All that's left is the final check."
+        ]
+      },
+      "X": {
+        "c": "Please take your fingers away and breathe deeply, three times. Wait until it fades.",
+        "d": 36,
+        "t": [
+          "You got this far and you can still let go.",
+          "At the end, how many times you stopped decides it.",
+          "Stay like that until you've settled."
+        ]
+      }
+    }
+  ],
+  "finale": {
+    "build": {
+      "c": "Please keep going in time with the beat, whatever way feels best. Don't stop until the counting starts.",
+      "d": 35,
+      "bpm": 104,
+      "t": [
+        "Last part. Let me check how many times you stopped.",
+        "If it's enough, I'll count down from 5. At 0, you can come.",
+        "Please don't stop your hand."
+      ]
+    },
+    "judge": {
+      "type": "marks"
+    },
+    "count": {
+      "from": 5,
+      "beat": 2.6,
+      "c": "Now {m} will count down from 5. At 0, you can come. Until then, please keep touching yourself and hold on.",
+      "stalls": [
+        {
+          "at": 2,
+          "t": "2... Please wait, just a little longer.",
+          "hold": 4
+        }
+      ]
+    },
+    "allow": {
+      "c": "Go ahead. Please keep going and come. When you do, please hit \"I came\" below.",
+      "t": [
+        "Go ahead, {n}.",
+        "Right on schedule.",
+        "I'm watching."
+      ]
+    },
+    "ruin": {
+      "c": "Please keep going until you're right on the edge, then take your fingers away. Rest both hands at your sides and don't touch yourself again.",
+      "d": 45,
+      "t": [
+        "You're just a little short on stops.",
+        "So please let go right before you come.",
+        "It's hard, I know. But a plan is a plan."
+      ]
+    },
+    "deny": {
+      "c": "Please take your hand away and close your legs. Rest both hands on your belly and stay like that until your breathing settles.",
+      "d": 40,
+      "t": [
+        "We'll end here tonight. You didn't stop enough times.",
+        "When it gets too close, please make sure to hit \"I'm close\".",
+        "Next Friday, let's practice again. Same plan."
+      ]
+    },
+    "after": {
+      "c": "Please take your hand away, stretch your legs out, and breathe slowly.",
+      "d": 26,
+      "t": [
+        "You did really well.",
+        "I'll go get you some water.",
+        "And starting Monday, please go back to teaching me the job, like always."
+      ]
+    }
+  },
+  "oops": {
+    "c": "Please take your hand away and breathe slowly.",
+    "t": [
+      "...I hadn't said you could yet.",
+      "You couldn't wait, could you?",
+      "Next time, please hold on until I say so."
+    ]
+  },
+  "endings": {
+    "allow": {
+      "title": "Right on Schedule",
+      "line": "Edges: {marks}. You followed {m}'s count and came, all the way to the end."
+    },
+    "ruin": {
+      "title": "Back to the Drawing Board",
+      "line": "Edges: {marks}. One step from the end, you had to let go."
+    },
+    "deny": {
+      "title": "Carried Over to Next Week",
+      "line": "Edges: {marks}. No release tonight. The rest waits until next Friday."
+    },
+    "oops": {
+      "title": "Ahead of Schedule",
+      "line": "You came before {m} said \"go ahead.\"",
+      "near": "Just {left} more and you'd have heard \"go ahead.\""
+    }
+  },
+  "fill": []
+}

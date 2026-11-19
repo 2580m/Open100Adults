@@ -1,0 +1,214 @@
+{
+  "id": "elfnoyado",
+  "body": "m",
+  "tone": "sweet",
+  "title": "The Forest Inn's Evening Service",
+  "blurb": "Over the pass, at the edge of the woods, you find a little inn. The room card lists an \"after-bath guided session,\" so you ask for one. The innkeeper who comes to your room is an elf with long, pointed ears. \"Your request is noted. I won't touch you. You'll use your own hand, exactly as I say.\"",
+  "tags": [
+    "Elf innkeeper",
+    "Polite and proper",
+    "Short",
+    "Light edging",
+    "You always get to cum"
+  ],
+  "mins": 7,
+  "names": {
+    "m": "the innkeeper",
+    "n": "traveler"
+  },
+  "segs": [
+    {
+      "name": "After the bath",
+      "P": {
+        "c": "Please lie back on the bed, or sit against the wall. Take your bottoms off, and keep tissues, and lube if you have some, within reach.",
+        "d": 20,
+        "t": [
+          "Welcome, {n}. You've come a long way.",
+          "I'll guide you just as you asked. If anything feels wrong, you may stop at any time.",
+          "I won't lay a finger on you. Your own hand, and my words."
+        ]
+      }
+    },
+    {
+      "name": "Easing the journey",
+      "bpm": 64,
+      "G": {
+        "c": "Please hold it loosely and stroke slowly from base to tip, in time with the beat.",
+        "d": 65,
+        "t": [
+          "The weariness of the road won't leave if you rush it.",
+          "This inn has welcomed travelers this way for three hundred years.",
+          "Let your shoulders relax as well.",
+          "Yes, that pace. Just like that.",
+          "If you feel close, please let me know by pressing \"I'm close\" below."
+        ]
+      },
+      "Y": {
+        "c": "Please loosen your grip and keep stroking at half speed.",
+        "d": 15,
+        "t": [
+          "Slowly.",
+          "Not yet."
+        ]
+      },
+      "R": {
+        "c": "Please let go and take 2 deep breaths.",
+        "d": 20,
+        "t": [
+          "A short rest.",
+          "If you begin to soften, you may give it a few strokes to bring it back.",
+          "That's a lovely look on you."
+        ]
+      },
+      "X": {
+        "c": "Please let go, rest both hands on your stomach, and take 3 deep breaths.",
+        "d": 30,
+        "t": [
+          "Oh, already? It must have built up on the road.",
+          "There's no need to be embarrassed.",
+          "When you've settled, we'll continue."
+        ]
+      }
+    },
+    {
+      "name": "Near the tip",
+      "bpm": 78,
+      "G": {
+        "c": "Please wet the head with spit or lube and stroke mostly near the top. If you're uncut, keep your foreskin over it.",
+        "d": 65,
+        "t": [
+          "Imagine it's the fragrant oil we press from the forest.",
+          "My ears twitch now and then. A habit. Please pay it no mind.",
+          "Your breathing has quickened.",
+          "Please keep quiet. There are other travelers in the next room.",
+          "If you're near your limit, please press \"I'm close\"."
+        ]
+      },
+      "Y": {
+        "c": "Please loosen your grip and keep stroking at half speed.",
+        "d": 15,
+        "t": [
+          "Gently.",
+          "Just like that."
+        ]
+      },
+      "R": {
+        "c": "Please let go and take one deep breath.",
+        "d": 20,
+        "t": [
+          "There.",
+          "Nearly there.",
+          "Please steady your breathing."
+        ]
+      },
+      "X": {
+        "c": "Please let go and take 2 deep breaths.",
+        "d": 30,
+        "t": [
+          "That was very close.",
+          "You stopped well.",
+          "All that remains is the finish."
+        ]
+      }
+    },
+    {
+      "name": "The finish",
+      "bpm": 92,
+      "G": {
+        "c": "Please wrap your whole hand around it and stroke from base to tip, in time with the beat.",
+        "d": 60,
+        "t": [
+          "From here, we finish.",
+          "Hold it however feels best to you.",
+          "You'll sleep soundly tonight.",
+          "Just a little longer.",
+          "Should it get too close, \"I'm close\" is right there."
+        ]
+      },
+      "Y": {
+        "c": "Please loosen your grip and keep stroking at half speed.",
+        "d": 15,
+        "t": [
+          "Ease off, please.",
+          "Soon now."
+        ]
+      },
+      "R": {
+        "c": "Please let go and take 2 deep breaths.",
+        "d": 20,
+        "t": [
+          "A brief pause.",
+          "If you begin to soften, you may give it a few strokes to bring it back.",
+          "After this, I'll count for you."
+        ]
+      },
+      "X": {
+        "c": "Please let go, rest both hands on your stomach, and take 2 deep breaths.",
+        "d": 30,
+        "t": [
+          "You were so close.",
+          "All that holding back will make it feel wonderful.",
+          "Now, let's count."
+        ]
+      }
+    }
+  ],
+  "finale": {
+    "build": {
+      "c": "Please stroke however feels best, in time with the beat. Keep going until {m} begins to count.",
+      "d": 25,
+      "bpm": 100,
+      "t": [
+        "Stay just like this until the end.",
+        "I'll count down from 4. When I reach 0, that's your signal to cum.",
+        "Please, make yourself comfortable."
+      ]
+    },
+    "judge": {
+      "type": "always"
+    },
+    "count": {
+      "from": 4,
+      "beat": 2.4,
+      "c": "I'll count down from 4. When I reach 0, you may cum. Until then, please keep stroking and wait.",
+      "stalls": []
+    },
+    "allow": {
+      "c": "You may cum now. Please keep stroking and let it all out. When you're done, please press \"I came\" below.",
+      "t": [
+        "Go ahead, {n}.",
+        "Please, let it all out.",
+        "You held on beautifully."
+      ]
+    },
+    "after": {
+      "c": "Please let go and breathe slowly.",
+      "d": 25,
+      "t": [
+        "You did well tonight.",
+        "Once you've cleaned up, there's water by your pillow.",
+        "Breakfast is served after sunrise. Rest well."
+      ]
+    }
+  },
+  "oops": {
+    "c": "Please let go and breathe slowly.",
+    "t": [
+      "Oh. You came?",
+      "That's quite all right. It was a long journey.",
+      "I'll leave some water for you."
+    ]
+  },
+  "endings": {
+    "allow": {
+      "title": "The Road, Left Behind",
+      "line": "You came right on {m}'s count, every last drop."
+    },
+    "oops": {
+      "title": "Before Her Word",
+      "line": "You came before {m} said \"go ahead.\"",
+      "near": "Only {left} to go and she'd have said \"go ahead.\""
+    }
+  },
+  "fill": []
+}
