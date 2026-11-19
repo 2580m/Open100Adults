@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getDictionary } from "@/data/i18n";
 import {
@@ -21,6 +21,7 @@ export function Header({ locale }: { locale: Locale }) {
   const dict = getDictionary(locale);
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // A navigation settles on a new pathname; drop the menu so it does not
   // linger over the next page.
@@ -31,24 +32,34 @@ export function Header({ locale }: { locale: Locale }) {
   useEffect(() => {
     if (!menuOpen) return;
 
+    const isSmall = !window.matchMedia("(min-width: 640px)").matches;
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (isSmall) {
+      document.body.style.overflow = "hidden";
+    }
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setMenuOpen(false);
     }
-    const desktop = window.matchMedia("(min-width: 1024px)");
-    function onDesktop(event: MediaQueryListEvent) {
-      if (event.matches) setMenuOpen(false);
+    function onPointerDown(event: PointerEvent) {
+      if (
+        containerRef.current &&
+        event.target instanceof Node &&
+        !containerRef.current.contains(event.target)
+      ) {
+        setMenuOpen(false);
+      }
     }
 
     document.addEventListener("keydown", onKeyDown);
-    desktop.addEventListener("change", onDesktop);
+    document.addEventListener("pointerdown", onPointerDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      if (isSmall) {
+        document.body.style.overflow = previousOverflow;
+      }
       document.removeEventListener("keydown", onKeyDown);
-      desktop.removeEventListener("change", onDesktop);
+      document.removeEventListener("pointerdown", onPointerDown);
     };
   }, [menuOpen]);
 
@@ -60,7 +71,7 @@ export function Header({ locale }: { locale: Locale }) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-card-border bg-background/60 pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
-      <div className="relative mx-auto max-w-6xl">
+      <div ref={containerRef} className="relative mx-auto max-w-6xl">
         <div className="flex h-14 items-center gap-3 px-4">
           <Link
             href={homeHref}
@@ -111,8 +122,9 @@ export function Header({ locale }: { locale: Locale }) {
               }
               aria-expanded={menuOpen}
               aria-controls="site-menu"
+              data-site-menu-toggle=""
               onClick={() => setMenuOpen((value) => !value)}
-              className="glass flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-soft transition-colors hover:text-foreground lg:hidden"
+              className="glass flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-soft transition-colors hover:text-foreground"
             >
               {menuOpen ? <CloseIcon /> : <MenuIcon />}
             </button>
@@ -123,7 +135,7 @@ export function Header({ locale }: { locale: Locale }) {
           <nav
             id="site-menu"
             aria-label={dict.header.menuAria}
-            className="absolute inset-x-0 top-full h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] overflow-y-auto overscroll-contain bg-background px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2 sm:inset-x-auto sm:right-4 sm:mt-2 sm:h-auto sm:max-h-[calc(100dvh-5.5rem)] sm:w-[min(40rem,calc(100vw-2rem))] sm:rounded-2xl sm:border sm:border-card-border sm:p-4 sm:shadow-2xl sm:shadow-black/60"
+            className="absolute inset-x-0 top-full z-50 h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] overflow-y-auto overscroll-contain bg-background px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2 sm:inset-x-auto sm:right-4 sm:mt-2 sm:h-auto sm:max-h-[calc(100dvh-5.5rem)] sm:w-[min(40rem,calc(100vw-2rem))] sm:rounded-2xl sm:border sm:border-card-border sm:bg-background/95 sm:p-4 sm:shadow-2xl sm:shadow-black/60 sm:backdrop-blur-xl"
           >
             <div className="grid gap-x-6 sm:grid-cols-2">
               {NAV_SECTIONS.map((section) => (
