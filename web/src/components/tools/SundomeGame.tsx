@@ -9,7 +9,13 @@ import {
 } from "react";
 
 import { ReactSettingsModal, GearIcon } from "@/components/tools/RemoteCtlSettingsModal";
-import { Phrase, RemoteElapsed, StarIcon, WatchPill } from "@/components/tools/RemoteShared";
+import {
+  Phrase,
+  RemoteElapsed,
+  StarIcon,
+  WatchPill,
+  copyTextToClipboard,
+} from "@/components/tools/RemoteShared";
 import { SundomeArc, type SundomeArcMode, type SundomeTrace } from "@/components/tools/SundomeArc";
 import { PARTNER_LEAD_MS, PARTNER_TEXT, PARTNER_VERSION } from "@/data/partnerCopy";
 import {
@@ -2964,14 +2970,14 @@ export function SundomeGame({
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard
-                            ?.writeText(remoteControlLink)
-                            .then(() => {
+                          void copyTextToClipboard(remoteControlLink).then((ok) => {
+                            if (ok) {
                               setRemoteCopied(true);
                               window.setTimeout(() => setRemoteCopied(false), 2000);
-                            });
+                            }
+                          });
                         }}
-                        className="cursor-pointer rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white"
+                        className="rpri shrink-0 cursor-pointer rounded-xl px-4 py-2 text-xs font-bold"
                       >
                         {remoteCopied ? rText.copied : rText.copy}
                       </button>
@@ -3105,12 +3111,14 @@ export function SundomeGame({
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard?.writeText(partnerUrl).then(() => {
-                            setPartnerCopied(true);
-                            window.setTimeout(() => setPartnerCopied(false), 2000);
+                          void copyTextToClipboard(partnerUrl).then((ok) => {
+                            if (ok) {
+                              setPartnerCopied(true);
+                              window.setTimeout(() => setPartnerCopied(false), 2000);
+                            }
                           });
                         }}
-                        className="cursor-pointer rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white"
+                        className="rpri shrink-0 cursor-pointer rounded-xl px-4 py-2 text-xs font-bold"
                       >
                         {partnerCopied ? rText.copied : rText.copy}
                       </button>

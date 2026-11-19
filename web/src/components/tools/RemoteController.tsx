@@ -20,6 +20,7 @@ import {
   RemoteElapsed,
   StarIcon,
   WatchPill,
+  copyTextToClipboard,
   driveLevelOf,
   formatMmSs,
   limitSummary,
@@ -2083,12 +2084,14 @@ export function RemoteController({ lang }: { lang: Locale }) {
           <button
             type="button"
             onClick={() => {
-              navigator.clipboard?.writeText(shareUrl).then(() => {
-                setInviteCopied(true);
-                window.setTimeout(() => setInviteCopied(false), 2000);
+              void copyTextToClipboard(shareUrl).then((ok) => {
+                if (ok) {
+                  setInviteCopied(true);
+                  window.setTimeout(() => setInviteCopied(false), 2000);
+                }
               });
             }}
-            className="cursor-pointer rounded-xl bg-accent px-4 py-2.5 text-xs font-bold text-white"
+            className="rpri shrink-0 cursor-pointer rounded-xl px-4 py-2.5 text-xs font-bold"
             data-remote-invite-copy
           >
             {inviteCopied ? r.copied : r.copy}

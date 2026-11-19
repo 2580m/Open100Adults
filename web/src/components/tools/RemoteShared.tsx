@@ -164,3 +164,47 @@ export function limitSummary(
   if (lim.nn) out.push(lt.nowNgShort);
   return out;
 }
+
+function legacyCopyText(text: string): boolean {
+  if (typeof document === "undefined") return false;
+  const el = document.createElement("textarea");
+  el.value = text;
+  el.setAttribute("readonly", "");
+  el.style.position = "fixed";
+  el.style.top = "0";
+  el.style.left = "0";
+  el.style.width = "2em";
+  el.style.height = "2em";
+  el.style.padding = "0";
+  el.style.border = "0";
+  el.style.opacity = "0";
+  const prevFocus = document.activeElement as HTMLElement | null;
+  document.body.appendChild(el);
+  try {
+    el.focus({ preventScroll: true });
+    el.select();
+    el.setSelectionRange(0, text.length);
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    document.body.removeChild(el);
+    try {
+      prevFocus?.focus({ preventScroll: true });
+    } catch {}
+  }
+}
+
+/** Copies text via Clipboard API when secure, with synchronous execCommand fallback for HTTP LAN origins. */
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  if (window.isSecureContext && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return legacyCopyText(text);
+    }
+  }
+  return legacyCopyText(text);
+}
