@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { ButtplugPanel } from "@/components/tools/ButtplugPanel";
 import { DglabPanel } from "@/components/tools/DglabPanel";
 import {
   SHUTTLE_LEVELS,
@@ -513,7 +514,10 @@ export function ShuttleGame({
         ) : null}
       </div>
 
-      <DglabPanel locale={locale} compact />
+      <div className="grid items-start gap-3 sm:grid-cols-2">
+        <DglabPanel locale={locale} compact />
+        <ButtplugPanel locale={locale} compact />
+      </div>
 
       {gateOpen && !accepted ? (
         <div

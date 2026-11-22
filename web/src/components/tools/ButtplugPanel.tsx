@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   DGLAB_COPY,
   WAVE_NAMES,
@@ -10,11 +12,18 @@ import type { Locale } from "@/data/tools";
 import { buttplugManager, useButtplug } from "@/lib/buttplug";
 import { dglabManager, useDglab } from "@/lib/dglab";
 
-export function ButtplugPanel({ locale }: { locale: Locale }) {
+export function ButtplugPanel({
+  locale,
+  compact = false,
+}: {
+  locale: Locale;
+  compact?: boolean;
+}) {
   const copy = DGLAB_COPY[locale];
   const waveLabels = WAVE_NAMES[locale];
   const bp = useButtplug();
   const dglab = useDglab();
+  const [open, setOpen] = useState(!compact);
   const connected = bp.status === "connected";
 
   const statusText =
@@ -39,16 +48,14 @@ export function ButtplugPanel({ locale }: { locale: Locale }) {
   return (
     <div
       data-buttplug-panel
-      className="space-y-5 rounded-2xl border border-card-border bg-card-bg p-4 text-left"
+      className="rounded-2xl border border-card-border bg-card-bg p-4 text-left"
     >
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-card-border pb-4">
+      {/* Header row */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-bold text-foreground">
-              {locale === "zh"
-                ? "Buttplug.io / Intiface Central"
-                : "Buttplug.io / Intiface Central"}
+              {compact ? "Buttplug.io" : "Buttplug.io / Intiface Central"}
             </p>
             <span
               className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${statusTone}`}
@@ -61,22 +68,66 @@ export function ButtplugPanel({ locale }: { locale: Locale }) {
           </div>
           <p className="mt-0.5 text-xs text-muted">
             {locale === "zh"
-              ? "Buttplug Protocol Spec v3 · Lovense / The Handy / OSR2 / 跳蛋"
-              : "Buttplug Protocol Spec v3 · Lovense / The Handy / OSR2 / 750+ Toys"}
+              ? "Intiface Central · 750+ 通用玩具"
+              : "Intiface Central · 750+ Toys"}
           </p>
         </div>
 
-        {connected && (
-          <button
-            type="button"
-            onClick={() => buttplugManager.emergencyStop()}
-            className="cursor-pointer rounded-full border border-rose-500/60 bg-rose-600/25 px-3 py-1 text-xs font-extrabold text-rose-200 hover:bg-rose-600/40"
-            data-buttplug-estop
-          >
-            {locale === "zh" ? "急停" : "E-Stop"}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {connected && (
+            <button
+              type="button"
+              onClick={() => buttplugManager.emergencyStop()}
+              className="cursor-pointer rounded-full border border-rose-500/60 bg-rose-600/25 px-3 py-1 text-xs font-extrabold text-rose-200 hover:bg-rose-600/40"
+              data-buttplug-estop
+            >
+              {locale === "zh" ? "急停" : "E-Stop"}
+            </button>
+          )}
+          {compact && (
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-card-border px-3 py-1 text-xs font-bold text-foreground transition-all duration-200 hover:border-accent active:scale-95"
+              data-buttplug-toggle
+            >
+              <span>{open ? copy.collapse : copy.expand}</span>
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                aria-hidden="true"
+                className={`h-3.5 w-3.5 transition-transform duration-300 ease-out ${
+                  open ? "rotate-180" : "rotate-0"
+                }`}
+              >
+                <path
+                  d="M4 6l4 4 4-4"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
+
+      <div
+        aria-hidden={!open}
+        className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${
+          open
+            ? "mt-4 grid-rows-[1fr] opacity-100"
+            : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div
+            className={`space-y-5 border-t border-card-border pt-4 transition-transform duration-300 ease-out ${
+              open ? "translate-y-0" : "-translate-y-1.5"
+            }`}
+          >
 
       {/* Connection Box */}
       <div className="space-y-3 rounded-xl border border-card-border bg-background/40 p-3.5">
@@ -339,6 +390,9 @@ export function ButtplugPanel({ locale }: { locale: Locale }) {
             />
           </label>
         ))}
+      </div>
+          </div>
+        </div>
       </div>
     </div>
   );

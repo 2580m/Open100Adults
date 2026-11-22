@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { ButtplugPanel } from "@/components/tools/ButtplugPanel";
 import { DglabPanel } from "@/components/tools/DglabPanel";
 import { storyCopy } from "@/data/storyCopy";
 import type { Story, StoryPhase } from "@/data/stories/types";
@@ -681,8 +682,9 @@ export function StoryPlayer({
           ← {player.backToStories}
         </Link>
 
-        <div className="mt-5">
+        <div className="mt-5 grid items-start gap-3 sm:grid-cols-2">
           <DglabPanel locale={locale} compact />
+          <ButtplugPanel locale={locale} compact />
         </div>
 
         {gateOpen && !accepted ? (
@@ -961,7 +963,10 @@ export function StoryPlayer({
         <span>{story.title}</span>
       </div>
 
-      <DglabPanel locale={locale} compact />
+      <div className="grid items-start gap-3 sm:grid-cols-2">
+        <DglabPanel locale={locale} compact />
+        <ButtplugPanel locale={locale} compact />
+      </div>
     </div>
   );
 }

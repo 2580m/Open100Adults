@@ -11,7 +11,6 @@ import {
   type WavePresetKey,
 } from "@/data/dglabCopy";
 import { IS_STATIC_EXPORT, type Locale } from "@/data/tools";
-import { buttplugManager, useButtplug } from "@/lib/buttplug";
 import { dglabManager, useDglab } from "@/lib/dglab";
 
 export function DglabPanel({
@@ -24,7 +23,6 @@ export function DglabPanel({
   const copy = DGLAB_COPY[locale];
   const waveLabels = WAVE_NAMES[locale];
   const snap = useDglab();
-  const bp = useButtplug();
 
   const [open, setOpen] = useState(!compact);
   const [qrSvg, setQrSvg] = useState<string>("");
@@ -32,25 +30,7 @@ export function DglabPanel({
 
   const connected =
     snap.status === "paired" || snap.status === "connected_ble";
-  const bpConnected = bp.status === "connected";
-  const anyConnected = connected || bpConnected;
-  const effectiveMode = !compact && snap.mode === "buttplug" ? "socket4" : snap.mode;
-  const transportTabs = (
-    compact
-      ? [
-          ["socket4", copy.tabSocket4],
-          ["socket", copy.tabSocket3],
-          ["ble3", copy.tabBle3],
-          ["ble2", copy.tabBle2],
-          ["buttplug", copy.tabButtplug],
-        ]
-      : [
-          ["socket4", copy.tabSocket4],
-          ["socket", copy.tabSocket3],
-          ["ble3", copy.tabBle3],
-          ["ble2", copy.tabBle2],
-        ]
-  ) as ReadonlyArray<readonly ["socket4" | "socket" | "ble3" | "ble2" | "buttplug", string]>;
+  const transportMode = snap.mode === "buttplug" ? "socket4" : snap.mode;
 
   useEffect(() => {
     let active = true;
@@ -103,20 +83,12 @@ export function DglabPanel({
               {copy.status[snap.status]}
               {connected ? ` · A:${snap.strengthA} / B:${snap.strengthB}` : ""}
             </span>
-            {bpConnected && (
-              <span
-                className="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300"
-                data-buttplug-status="connected"
-              >
-                ● Buttplug · {bp.devices.length} · {bp.intensity}%
-              </span>
-            )}
           </div>
           <p className="mt-0.5 text-xs text-muted">{copy.cardSub}</p>
         </div>
 
         <div className="flex items-center gap-2">
-          {anyConnected && (
+          {connected && (
             <button
               type="button"
               onClick={() => dglabManager.emergencyStop()}
@@ -172,13 +144,20 @@ export function DglabPanel({
           >
           {/* Transport Mode Tabs */}
           <div className="flex flex-wrap gap-2">
-            {transportTabs.map(([m, label]) => (
+            {(
+              [
+                ["socket4", copy.tabSocket4],
+                ["socket", copy.tabSocket3],
+                ["ble3", copy.tabBle3],
+                ["ble2", copy.tabBle2],
+              ] as const
+            ).map(([m, label]) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => dglabManager.setMode(m)}
                 className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-xs font-bold ${
-                  effectiveMode === m
+                  transportMode === m
                     ? "border-accent bg-accent-soft text-foreground"
                     : "border-card-border text-muted-strong hover:text-foreground"
                 }`}
@@ -189,10 +168,10 @@ export function DglabPanel({
           </div>
 
           {/* Connection Section */}
-          {effectiveMode === "socket4" || effectiveMode === "socket" ? (
+          {transportMode === "socket4" || transportMode === "socket" ? (
             <div className="space-y-3 rounded-xl border border-card-border bg-background/40 p-3.5">
               <p className="text-xs leading-relaxed text-muted-strong">
-                {effectiveMode === "socket4" ? copy.socket4Lead : copy.socketLead}
+                {transportMode === "socket4" ? copy.socket4Lead : copy.socketLead}
               </p>
 
               {IS_STATIC_EXPORT && snap.wsEndpointMode === "lan" && (
@@ -256,7 +235,11 @@ export function DglabPanel({
               </div>
 
               {snap.qrUrl && (
-                <div className="flex flex-col items-start gap-4 pt-2 sm:flex-row sm:items-center">
+                <div
+                  className={`flex flex-col items-start gap-4 pt-2 ${
+                    compact ? "" : "sm:flex-row sm:items-center"
+                  }`}
+                >
                   {qrSvg && (
                     <div
                       className="shrink-0 overflow-hidden rounded-xl border border-card-border bg-white p-2"
@@ -292,7 +275,7 @@ export function DglabPanel({
                 </div>
               )}
 
-              {effectiveMode === "socket4" && snap.status === "paired" && (
+              {transportMode === "socket4" && snap.status === "paired" && (
                 <div
                   className="space-y-1.5 border-t border-card-border pt-2.5"
                   data-dglab-v4-devices
@@ -335,197 +318,6 @@ export function DglabPanel({
                 </div>
               )}
             </div>
-          ) : effectiveMode === "buttplug" ? (
-            <div className="space-y-3 rounded-xl border border-card-border bg-background/40 p-3.5">
-              <p className="text-xs leading-relaxed text-muted-strong">
-                {copy.buttplugLead}
-              </p>
-
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold text-muted">
-                  {copy.buttplugWsLabel}
-                </label>
-                <input
-                  type="text"
-                  value={bp.wsUrl}
-                  onChange={(e) => buttplugManager.setWsUrl(e.target.value)}
-                  placeholder="ws://127.0.0.1:12345"
-                  data-buttplug-ws
-                  className="w-full rounded-xl border border-card-border bg-card-bg px-3 py-2 text-xs font-mono text-foreground"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {bpConnected ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => buttplugManager.disconnect()}
-                      className="cursor-pointer rounded-xl border border-card-border px-4 py-2 text-xs font-bold text-foreground hover:border-rose-400"
-                    >
-                      {copy.disconnect}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        bp.scanning
-                          ? buttplugManager.stopScanning()
-                          : buttplugManager.startScanning()
-                      }
-                      data-buttplug-scan
-                      className="rpri cursor-pointer rounded-xl px-4 py-2 text-xs font-bold"
-                    >
-                      {bp.scanning ? copy.buttplugScanning : copy.buttplugScan}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={bp.status === "connecting"}
-                    onClick={() => buttplugManager.connect()}
-                    data-buttplug-connect
-                    className="rpri cursor-pointer rounded-xl px-4 py-2 text-xs font-bold disabled:opacity-50"
-                  >
-                    {bp.status === "connecting"
-                      ? copy.buttplugConnecting
-                      : copy.buttplugConnect}
-                  </button>
-                )}
-              </div>
-
-              {bp.errorText && (
-                <p className="text-xs font-semibold text-rose-300">
-                  {bp.errorText}
-                </p>
-              )}
-
-              {bpConnected && (
-                <div
-                  className="space-y-2 border-t border-card-border pt-2.5"
-                  data-buttplug-devices
-                >
-                  {bp.devices.length === 0 ? (
-                    <p className="text-xs text-amber-200/90">
-                      {copy.buttplugNoDevices}
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {bp.devices.map((dev) => {
-                        const cmdKinds = Array.from(
-                          new Set(dev.actuators.map((a) => a.cmd)),
-                        );
-                        return (
-                          <div
-                            key={dev.index}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-card-border bg-card-bg/60 px-3 py-2"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-bold text-foreground">
-                                {dev.displayName || dev.name}
-                              </p>
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {cmdKinds.map((cmd) => (
-                                  <span
-                                    key={cmd}
-                                    className="rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[10px] font-bold text-accent"
-                                  >
-                                    {copy.buttplugCmds[cmd]}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                buttplugManager.toggleDeviceEnabled(dev.index)
-                              }
-                              className={`cursor-pointer rounded-full border px-2.5 py-1 text-[11px] font-bold ${
-                                dev.enabled
-                                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                                  : "border-card-border text-muted"
-                              }`}
-                            >
-                              {dev.enabled
-                                ? copy.buttplugEnabled
-                                : copy.buttplugPaused}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Buttplug Safety Limit & Manual Output Intensity */}
-              <div className="space-y-2 rounded-xl border border-card-border bg-background/30 p-3">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-xs font-bold text-foreground">
-                    {copy.buttplugIntensity}
-                  </span>
-                  <span className="text-base font-extrabold tabular-nums text-accent">
-                    {bp.intensity}%
-                    <span className="ml-1 text-[11px] font-normal text-muted">
-                      / {bp.maxIntensity}%
-                    </span>
-                  </span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-accent transition-all"
-                    style={{
-                      width: `${Math.min(100, Math.round((bp.intensity / Math.max(1, bp.maxIntensity)) * 100))}%`,
-                    }}
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {[-10, -5, 5, 10].map((delta) => (
-                    <button
-                      key={delta}
-                      type="button"
-                      disabled={!bpConnected}
-                      onClick={() =>
-                        buttplugManager.setIntensity(bp.intensity + delta)
-                      }
-                      className="flex-1 cursor-pointer rounded-lg border border-card-border py-1 text-xs font-bold text-foreground hover:border-accent disabled:opacity-40"
-                    >
-                      {delta > 0 ? `+${delta}%` : `${delta}%`}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    disabled={!bpConnected}
-                    onClick={() => buttplugManager.setIntensity(0)}
-                    className="cursor-pointer rounded-lg border border-card-border px-2.5 py-1 text-xs font-bold text-muted-strong hover:text-foreground disabled:opacity-40"
-                  >
-                    0
-                  </button>
-                </div>
-                <div className="pt-1">
-                  <div className="flex items-center justify-between text-[11px] text-muted">
-                    <span>
-                      {copy.buttplugMaxCap}:{" "}
-                      <b className="text-foreground">{bp.maxIntensity}%</b>
-                    </span>
-                    {bp.serverName && (
-                      <span className="truncate text-emerald-300">
-                        {bp.serverName}
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={bp.maxIntensity}
-                    onChange={(e) =>
-                      buttplugManager.setMaxIntensity(Number(e.target.value))
-                    }
-                    className="mt-1 w-full accent-[var(--accent)]"
-                  />
-                </div>
-              </div>
-            </div>
           ) : (
             <div className="space-y-3 rounded-xl border border-card-border bg-background/40 p-3.5">
               <p className="text-xs leading-relaxed text-muted-strong">
@@ -556,29 +348,27 @@ export function DglabPanel({
                     disabled={!snap.bleSupported || !snap.secureContext}
                     onClick={() =>
                       void dglabManager.connectBle(
-                        effectiveMode === "ble2" ? "ble2" : "ble3",
+                        transportMode === "ble2" ? "ble2" : "ble3",
                       )
                     }
                     className="rpri cursor-pointer rounded-xl px-4 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40"
                     data-dglab-connect-ble
                   >
-                    {effectiveMode === "ble2" ? copy.connectBle2 : copy.connectBle3}
+                    {transportMode === "ble2" ? copy.connectBle2 : copy.connectBle3}
                   </button>
                 )}
               </div>
             </div>
           )}
 
-          {snap.errorText && effectiveMode !== "buttplug" && (
+          {snap.errorText && (
             <p className="text-xs font-semibold text-rose-300">
               {snap.errorText}
             </p>
           )}
 
           {/* Dual Channel Controls + Safety Caps */}
-          {effectiveMode !== "buttplug" && (
-          <>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className={`grid gap-3 ${compact ? "grid-cols-1" : "sm:grid-cols-2"}`}>
             {(
               [
                 {
@@ -653,7 +443,7 @@ export function DglabPanel({
                       <span>
                         {copy.localCap}: <b className="text-foreground">{item.max}</b>
                       </span>
-                      {(effectiveMode === "socket4" || effectiveMode === "socket") && (
+                      {(transportMode === "socket4" || transportMode === "socket") && (
                         <span>
                           {copy.appMax}: {item.appMax}
                         </span>
@@ -680,8 +470,6 @@ export function DglabPanel({
             })}
           </div>
           <p className="text-[11px] text-muted">{copy.capHint}</p>
-          </>
-          )}
 
           {/* Waveform Presets & Output Controls */}
           <div className="space-y-2.5">
@@ -718,21 +506,15 @@ export function DglabPanel({
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="button"
-                disabled={!anyConnected}
-                onClick={() =>
-                  dglabManager.setOutputActive(
-                    !(snap.outputActive || bp.outputActive),
-                  )
-                }
+                disabled={!connected}
+                onClick={() => dglabManager.setOutputActive(!snap.outputActive)}
                 className="rpri cursor-pointer rounded-xl px-4 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {snap.outputActive || bp.outputActive
-                  ? copy.pauseOutput
-                  : copy.startOutput}
+                {snap.outputActive ? copy.pauseOutput : copy.startOutput}
               </button>
               <button
                 type="button"
-                disabled={!anyConnected}
+                disabled={!connected}
                 onClick={() => dglabManager.triggerBurst(snap.waveA, 1500, 70)}
                 className="cursor-pointer rounded-xl border border-card-border px-4 py-2 text-xs font-bold text-foreground hover:border-accent disabled:opacity-40"
               >
