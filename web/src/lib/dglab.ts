@@ -438,34 +438,44 @@ class DglabManager {
     if (this.snap.strengthB > cB) this.setChannelStrength("B", cB);
   }
 
-  private resolveSocketUrl(): string | null {
+  private resolveSocketEndpoints(): { connectUrl: string; qrWsBase: string } | null {
     const isV4 = this.snap.mode === "socket4";
+    const path = isV4 ? "/dglab-ws/v4" : "/dglab-ws";
+    const toWs = (httpUrl: string) =>
+      httpUrl
+        .replace(/^https:/i, "wss:")
+        .replace(/^http:/i, "ws:")
+        .replace(/\/+$/, "");
+
     if (this.snap.wsEndpointMode === "custom") {
       const clean = this.snap.customWsUrl.trim().replace(/\/+$/, "");
       if (!/^wss?:\/\//i.test(clean)) return null;
-      return clean;
+      return { connectUrl: clean, qrWsBase: clean };
     }
     if (this.snap.wsEndpointMode === "official") {
-      return isV4 ? OFFICIAL_V4_WS_URL : OFFICIAL_V3_WS_URL;
+      const url = isV4 ? OFFICIAL_V4_WS_URL : OFFICIAL_V3_WS_URL;
+      return { connectUrl: url, qrWsBase: url };
     }
     if (typeof window === "undefined") return null;
     if (IS_STATIC_EXPORT) {
       if (this.snap.wsEndpointMode === "auto") {
-        return isV4 ? OFFICIAL_V4_WS_URL : OFFICIAL_V3_WS_URL;
+        const url = isV4 ? OFFICIAL_V4_WS_URL : OFFICIAL_V3_WS_URL;
+        return { connectUrl: url, qrWsBase: url };
       }
       return null;
     }
 
+    const localUrl = `${toWs(window.location.origin)}${path}`;
+    if (this.snap.wsEndpointMode === "lan") {
+      return { connectUrl: localUrl, qrWsBase: localUrl };
+    }
+
     const w = window as unknown as { __OPEN100_PUBLIC_ORIGIN__?: string };
-    const httpOrigin =
-      this.snap.wsEndpointMode === "auto" && w.__OPEN100_PUBLIC_ORIGIN__
-        ? w.__OPEN100_PUBLIC_ORIGIN__
-        : window.location.origin;
-    const wsOrigin = httpOrigin
-      .replace(/^https:/i, "wss:")
-      .replace(/^http:/i, "ws:")
-      .replace(/\/+$/, "");
-    return `${wsOrigin}${isV4 ? "/dglab-ws/v4" : "/dglab-ws"}`;
+    const qrOrigin = w.__OPEN100_PUBLIC_ORIGIN__ || window.location.origin;
+    const qrWsBase = `${toWs(qrOrigin)}${path}`;
+    // Connect the browser directly to the same-origin server WS (fast LAN/HTTP) while
+    // putting the public Tunnel WSS in the App QR code so the phone can join externally.
+    return { connectUrl: localUrl, qrWsBase };
   }
 
   private syncV4DevicesSnapshot() {
@@ -656,8 +666,8 @@ class DglabManager {
       this.update({ mode: requestedMode });
     }
 
-    const baseWs = this.resolveSocketUrl();
-    if (!baseWs) {
+    const initialEndpoints = this.resolveSocketEndpoints();
+    if (!initialEndpoints) {
       this.update({
         status: "error",
         errorText: "Missing valid WebSocket relay URL",
@@ -668,7 +678,13 @@ class DglabManager {
     // Refresh public origin first in auto mode so Cloudflare Tunnel URL is up to date
     if (this.snap.wsEndpointMode === "auto" && !IS_STATIC_EXPORT) {
       try {
-        const res = await fetch("/api/rgate/public-url", { cache: "no-store" });
+        const ac = new AbortController();
+        const t = window.setTimeout(() => ac.abort(), 1500);
+        const res = await fetch("/api/rgate/public-url", {
+          cache: "no-store",
+          signal: ac.signal,
+        });
+        window.clearTimeout(t);
         const j = (await res.json()) as { publicOrigin?: string };
         if (j?.publicOrigin) {
           (
@@ -678,7 +694,7 @@ class DglabManager {
       } catch {}
     }
 
-    const finalWsBase = this.resolveSocketUrl() || baseWs;
+    const endpoints = this.resolveSocketEndpoints() || initialEndpoints;
     this.update({
       status: "waiting_qr",
       errorText: "",
@@ -690,8 +706,25 @@ class DglabManager {
     });
 
     try {
-      const ws = new WebSocket(finalWsBase);
+      const ws = new WebSocket(endpoints.connectUrl);
       this.ws = ws;
+      const connectTimeout = window.setTimeout(() => {
+        if (this.ws === ws && ws.readyState === WebSocket.CONNECTING) {
+          try {
+            ws.close();
+          } catch {}
+          this.stopPumps();
+          this.update({
+            status: "error",
+            errorText: `WebSocket connection timed out (${endpoints.connectUrl})`,
+            outputActive: false,
+          });
+        }
+      }, 8000);
+
+      ws.onopen = () => {
+        window.clearTimeout(connectTimeout);
+      };
 
       ws.onmessage = (ev) => {
         if (this.ws !== ws) return;
@@ -713,7 +746,7 @@ class DglabManager {
             this.v4KnownStrength.clear();
             this.update({
               clientId: cId,
-              qrUrl: buildV4QrUrl(finalWsBase, cId),
+              qrUrl: buildV4QrUrl(endpoints.qrWsBase, cId),
               status: "waiting_qr",
             });
             return;
@@ -776,7 +809,7 @@ class DglabManager {
         if (msg.type === "bind") {
           if (msg.message === "targetId" && typeof msg.clientId === "string") {
             const cId = msg.clientId;
-            const qrTarget = `https://www.dungeon-lab.com/app-download.php#DGLAB-SOCKET#${finalWsBase.replace(/\/+$/, "")}/${cId}`;
+            const qrTarget = `https://www.dungeon-lab.com/app-download.php#DGLAB-SOCKET#${endpoints.qrWsBase.replace(/\/+$/, "")}/${cId}`;
             this.update({
               clientId: cId,
               qrUrl: qrTarget,
@@ -834,6 +867,7 @@ class DglabManager {
       };
 
       ws.onerror = () => {
+        window.clearTimeout(connectTimeout);
         if (this.ws !== ws) return;
         this.stopPumps();
         this.update({
@@ -844,6 +878,7 @@ class DglabManager {
       };
 
       ws.onclose = () => {
+        window.clearTimeout(connectTimeout);
         if (this.ws !== ws) return;
         this.ws = null;
         this.stopPumps();
