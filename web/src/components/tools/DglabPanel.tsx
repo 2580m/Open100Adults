@@ -145,7 +145,8 @@ export function DglabPanel({
           <div className="flex flex-wrap gap-2">
             {(
               [
-                ["socket", copy.tabSocket],
+                ["socket4", copy.tabSocket4],
+                ["socket", copy.tabSocket3],
                 ["ble3", copy.tabBle3],
                 ["ble2", copy.tabBle2],
               ] as const
@@ -166,13 +167,13 @@ export function DglabPanel({
           </div>
 
           {/* Connection Section */}
-          {snap.mode === "socket" ? (
+          {snap.mode === "socket4" || snap.mode === "socket" ? (
             <div className="space-y-3 rounded-xl border border-card-border bg-background/40 p-3.5">
               <p className="text-xs leading-relaxed text-muted-strong">
-                {copy.socketLead}
+                {snap.mode === "socket4" ? copy.socket4Lead : copy.socketLead}
               </p>
 
-              {IS_STATIC_EXPORT && snap.wsEndpointMode !== "custom" && (
+              {IS_STATIC_EXPORT && snap.wsEndpointMode === "lan" && (
                 <p className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
                   {copy.staticSocketWarn}
                 </p>
@@ -183,7 +184,7 @@ export function DglabPanel({
                   {copy.wsModeLabel}
                 </label>
                 <div className="flex flex-wrap gap-1.5">
-                  {(["auto", "lan", "custom"] as const).map((wm) => (
+                  {(["auto", "official", "lan", "custom"] as const).map((wm) => (
                     <button
                       key={wm}
                       type="button"
@@ -266,6 +267,49 @@ export function DglabPanel({
                       )}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {snap.mode === "socket4" && snap.status === "paired" && (
+                <div
+                  className="space-y-1.5 border-t border-card-border pt-2.5"
+                  data-dglab-v4-devices
+                >
+                  <p className="text-[11px] font-bold text-muted">
+                    {copy.devicesTitle}
+                  </p>
+                  {snap.devices.length === 0 ? (
+                    <p className="text-xs text-amber-200/90">
+                      {copy.noV4Devices}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {snap.devices.map((dev) => {
+                        const typeLabel =
+                          copy.deviceTypes[
+                            dev.type as keyof typeof copy.deviceTypes
+                          ] ?? dev.type;
+                        return (
+                          <span
+                            key={dev.slotId}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
+                              dev.hasDevice
+                                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                                : "border-card-border text-muted"
+                            }`}
+                          >
+                            <span>{dev.name || typeLabel}</span>
+                            <span className="text-muted">({typeLabel})</span>
+                            {dev.power !== undefined && (
+                              <span className="tabular-nums text-accent">
+                                {Math.round(dev.power)}%
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -9,8 +9,8 @@ import {
 } from "@/data/dglabCopy";
 import { IS_STATIC_EXPORT } from "@/data/tools";
 
-export type DglabTransportMode = "socket" | "ble3" | "ble2";
-export type DglabWsEndpointMode = "auto" | "lan" | "custom";
+export type DglabTransportMode = "socket4" | "socket" | "ble3" | "ble2";
+export type DglabWsEndpointMode = "auto" | "official" | "lan" | "custom";
 export type DglabConnectionStatus =
   | "disconnected"
   | "waiting_qr"
@@ -18,6 +18,22 @@ export type DglabConnectionStatus =
   | "connecting_ble"
   | "connected_ble"
   | "error";
+
+export interface DglabV4Device {
+  slotId: string;
+  name: string;
+  type: string;
+  hasDevice: boolean;
+  power?: number;
+  intensityA?: number;
+  intensityB?: number;
+  maxA?: number;
+  maxB?: number;
+  pressure?: number;
+  edgeState?: number;
+  rawProps?: Record<string, unknown>;
+  rawSlotState?: Record<string, unknown>;
+}
 
 export interface DglabPrefs {
   autoSync: boolean;
@@ -36,6 +52,8 @@ export interface DglabSnapshot {
   qrUrl: string;
   wsEndpointMode: DglabWsEndpointMode;
   customWsUrl: string;
+  devices: DglabV4Device[];
+  activeSlotId: string;
   strengthA: number;
   strengthB: number;
   appLimitA: number;
@@ -130,10 +148,76 @@ async function writeBle(
   }
 }
 
+const OFFICIAL_V4_WS_URL = "wss://trex.dungeon-lab.cn/v4";
+const OFFICIAL_V3_WS_URL = "wss://ws.dungeon-lab.cn";
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function buildV4QrUrl(baseWsUrl: string, targetId: string): string {
+  const clean = baseWsUrl.trim();
+  const sep = clean.includes("?") ? "&" : clean.endsWith("/") ? "?" : "/?";
+  const appSocketUrl = `${clean}${sep}tid=${encodeURIComponent(targetId)}`;
+  return `https://dungeon-lab.cn/s/?v=1&action=socket&url=${encodeURIComponent(appSocketUrl)}`;
+}
+
+function readNum(obj: Record<string, unknown> | undefined, key: string): number | undefined {
+  const v = obj?.[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+function readMaxFromChannelState(chState: unknown): number | undefined {
+  if (!isRecord(chState)) return undefined;
+  const direct = readNum(chState, "intensityMax");
+  if (direct !== undefined) return Math.max(1, clamp200(direct));
+  if (isRecord(chState.comfortLimit)) {
+    const cMax = readNum(chState.comfortLimit, "comfortMax");
+    if (cMax !== undefined) return Math.max(1, clamp200(cMax));
+    const aMax = readNum(chState.comfortLimit, "absoluteMax");
+    if (aMax !== undefined) return Math.max(1, clamp200(aMax));
+  }
+  return undefined;
+}
+
+function parseV4Device(raw: unknown): DglabV4Device | null {
+  if (!isRecord(raw) || typeof raw.slotId !== "string" || !raw.slotId) return null;
+  const props = isRecord(raw.props) ? raw.props : undefined;
+  const slotState = isRecord(raw.slotState) ? raw.slotState : undefined;
+  const edge = slotState && isRecord(slotState.edge) ? slotState.edge : undefined;
+  return {
+    slotId: raw.slotId,
+    name: typeof raw.name === "string" && raw.name ? raw.name : raw.slotId,
+    type: typeof raw.type === "string" ? raw.type : "UNKNOWN",
+    hasDevice:
+      slotState && typeof slotState.hasDevice === "boolean"
+        ? slotState.hasDevice
+        : true,
+    power: readNum(props, "power"),
+    intensityA: readNum(props, "intensityA"),
+    intensityB: readNum(props, "intensityB"),
+    maxA: readMaxFromChannelState(slotState?.channelA),
+    maxB: readMaxFromChannelState(slotState?.channelB),
+    pressure: readNum(props, "pressure"),
+    edgeState: readNum(edge, "edgeState"),
+    rawProps: props,
+    rawSlotState: slotState,
+  };
+}
+
+function isStimV4Device(dev: DglabV4Device): boolean {
+  return dev.type !== "BMTR_1";
+}
+
 class DglabManager {
   private snap: DglabSnapshot;
   private listeners = new Set<() => void>();
   private ws: WebSocket | null = null;
+  private activeSocketVersion: "v3" | "v4" = "v4";
+  private v4Clients = new Map<string, DglabV4Device[]>();
+  private v4PendingDevices = new Map<string, string>();
+  private v4KnownStrength = new Map<string, { a: number; b: number }>();
+  private v4ReqSeq = 1;
   private socketPumpTimer: number | null = null;
   private bleTimer: number | null = null;
   private burstRestoreTimer: number | null = null;
@@ -148,7 +232,7 @@ class DglabManager {
 
   constructor() {
     this.snap = {
-      mode: IS_STATIC_EXPORT ? "ble3" : "socket",
+      mode: IS_STATIC_EXPORT ? "ble3" : "socket4",
       status: "disconnected",
       errorText: "",
       clientId: "",
@@ -156,6 +240,8 @@ class DglabManager {
       qrUrl: "",
       wsEndpointMode: "auto",
       customWsUrl: "",
+      devices: [],
+      activeSlotId: "",
       strengthA: 0,
       strengthB: 0,
       appLimitA: 200,
@@ -203,9 +289,21 @@ class DglabManager {
         if (typeof p.maxB === "number") savedMaxB = clamp200(p.maxB);
         if (p.waveA) savedWaveA = p.waveA;
         if (p.waveB) savedWaveB = p.waveB;
-        if (p.wsEndpointMode) savedEndpointMode = p.wsEndpointMode;
+        if (
+          p.wsEndpointMode === "auto" ||
+          p.wsEndpointMode === "official" ||
+          p.wsEndpointMode === "lan" ||
+          p.wsEndpointMode === "custom"
+        ) {
+          savedEndpointMode = p.wsEndpointMode;
+        }
         if (typeof p.customWsUrl === "string") savedCustomWs = p.customWsUrl;
-        if (p.mode && (!IS_STATIC_EXPORT || p.mode !== "socket")) {
+        if (
+          p.mode === "socket4" ||
+          p.mode === "socket" ||
+          p.mode === "ble3" ||
+          p.mode === "ble2"
+        ) {
           savedMode = p.mode;
         }
         if (p.prefs && typeof p.prefs === "object") {
@@ -305,13 +403,22 @@ class DglabManager {
   }
 
   private resolveSocketUrl(): string | null {
+    const isV4 = this.snap.mode === "socket4";
     if (this.snap.wsEndpointMode === "custom") {
       const clean = this.snap.customWsUrl.trim().replace(/\/+$/, "");
       if (!/^wss?:\/\//i.test(clean)) return null;
       return clean;
     }
+    if (this.snap.wsEndpointMode === "official") {
+      return isV4 ? OFFICIAL_V4_WS_URL : OFFICIAL_V3_WS_URL;
+    }
     if (typeof window === "undefined") return null;
-    if (IS_STATIC_EXPORT && this.snap.wsEndpointMode !== "lan") return null;
+    if (IS_STATIC_EXPORT) {
+      if (this.snap.wsEndpointMode === "auto") {
+        return isV4 ? OFFICIAL_V4_WS_URL : OFFICIAL_V3_WS_URL;
+      }
+      return null;
+    }
 
     const w = window as unknown as { __OPEN100_PUBLIC_ORIGIN__?: string };
     const httpOrigin =
@@ -322,11 +429,197 @@ class DglabManager {
       .replace(/^https:/i, "wss:")
       .replace(/^http:/i, "ws:")
       .replace(/\/+$/, "");
-    return `${wsOrigin}/dglab-ws`;
+    return `${wsOrigin}${isV4 ? "/dglab-ws/v4" : "/dglab-ws"}`;
+  }
+
+  private syncV4DevicesSnapshot() {
+    const allDevices: DglabV4Device[] = [];
+    for (const list of this.v4Clients.values()) {
+      for (const dev of list) {
+        allDevices.push(dev);
+      }
+    }
+    const stimList = allDevices.filter(isStimV4Device);
+    const primary =
+      stimList.find((d) => d.type === "COYOTE_030") ??
+      stimList.find((d) => d.type === "COYOTE_020") ??
+      stimList[0] ??
+      allDevices[0];
+
+    for (const dev of stimList) {
+      const prev = this.v4KnownStrength.get(dev.slotId) ?? { a: 0, b: 0 };
+      this.v4KnownStrength.set(dev.slotId, {
+        a: dev.intensityA !== undefined ? clamp200(dev.intensityA) : prev.a,
+        b: dev.intensityB !== undefined ? clamp200(dev.intensityB) : prev.b,
+      });
+    }
+
+    const patch: Partial<DglabSnapshot> = {
+      devices: allDevices,
+      activeSlotId: primary?.slotId ?? "",
+    };
+    if (primary && isStimV4Device(primary)) {
+      if (primary.maxA !== undefined) patch.appLimitA = primary.maxA;
+      if (primary.maxB !== undefined) patch.appLimitB = primary.maxB;
+      if (primary.intensityA !== undefined) {
+        patch.strengthA = clamp200(primary.intensityA);
+      }
+      if (primary.intensityB !== undefined) {
+        patch.strengthB = clamp200(primary.intensityB);
+      }
+    }
+    this.update(patch);
+  }
+
+  private sendV4Rpc(appClientId: string, m: string, data?: Record<string, unknown>) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    const reqId = `r-${this.v4ReqSeq++}`;
+    if (m === "devices.get") {
+      this.v4PendingDevices.set(reqId, appClientId);
+    }
+    this.ws.send(
+      JSON.stringify({
+        type: "message",
+        clientId: appClientId,
+        data: {
+          t: "req",
+          reqId,
+          m,
+          ...(data !== undefined ? { data } : {}),
+        },
+      }),
+    );
+  }
+
+  private forEachV4StimTarget(fn: (appClientId: string, dev: DglabV4Device) => void) {
+    for (const [appClientId, list] of this.v4Clients.entries()) {
+      for (const dev of list) {
+        if (isStimV4Device(dev)) {
+          fn(appClientId, dev);
+        }
+      }
+    }
+  }
+
+  private handleV4EventOrResp(appClientId: string, payload: Record<string, unknown>) {
+    if (payload.t === "resp" && typeof payload.reqId === "string") {
+      const pendingClient = this.v4PendingDevices.get(payload.reqId);
+      if (pendingClient) {
+        this.v4PendingDevices.delete(payload.reqId);
+        if (isRecord(payload.result) && Array.isArray(payload.result.devices)) {
+          const parsed = payload.result.devices
+            .map(parseV4Device)
+            .filter((d): d is DglabV4Device => d !== null);
+          this.v4Clients.set(pendingClient, parsed);
+          this.syncV4DevicesSnapshot();
+        }
+      }
+      return;
+    }
+
+    if (payload.t !== "ev" || typeof payload.ev !== "string") return;
+
+    if (payload.ev === "devices.snapshot" && Array.isArray(payload.devices)) {
+      const parsed = payload.devices
+        .map(parseV4Device)
+        .filter((d): d is DglabV4Device => d !== null);
+      this.v4Clients.set(appClientId, parsed);
+      this.syncV4DevicesSnapshot();
+      return;
+    }
+
+    if (payload.ev === "devices.patch") {
+      const cur = [...(this.v4Clients.get(appClientId) ?? [])];
+      const removed = new Set(
+        Array.isArray(payload.removed)
+          ? payload.removed.filter((id): id is string => typeof id === "string")
+          : [],
+      );
+      const nextList = cur.filter((d) => !removed.has(d.slotId));
+      if (Array.isArray(payload.added)) {
+        for (const raw of payload.added) {
+          const dev = parseV4Device(raw);
+          if (dev && !nextList.some((d) => d.slotId === dev.slotId)) {
+            nextList.push(dev);
+          }
+        }
+      }
+      this.v4Clients.set(appClientId, nextList);
+      this.syncV4DevicesSnapshot();
+      return;
+    }
+
+    if (payload.ev === "slots.patch" && Array.isArray(payload.slots)) {
+      const cur = [...(this.v4Clients.get(appClientId) ?? [])];
+      let changed = false;
+      for (const patchRaw of payload.slots) {
+        if (!isRecord(patchRaw) || typeof patchRaw.slotId !== "string") continue;
+        const idx = cur.findIndex((d) => d.slotId === patchRaw.slotId);
+        if (idx === -1) continue;
+        const prev = cur[idx];
+        const nextProps = isRecord(patchRaw.props)
+          ? { ...(prev.rawProps ?? {}), ...patchRaw.props }
+          : prev.rawProps;
+        const prevState = prev.rawSlotState ?? {};
+        const patchState = isRecord(patchRaw.slotState) ? patchRaw.slotState : {};
+        const mergedState: Record<string, unknown> = { ...prevState, ...patchState };
+        if (isRecord(prevState.channelA) || isRecord(patchState.channelA)) {
+          mergedState.channelA = {
+            ...(isRecord(prevState.channelA) ? prevState.channelA : {}),
+            ...(isRecord(patchState.channelA) ? patchState.channelA : {}),
+          };
+        }
+        if (isRecord(prevState.channelB) || isRecord(patchState.channelB)) {
+          mergedState.channelB = {
+            ...(isRecord(prevState.channelB) ? prevState.channelB : {}),
+            ...(isRecord(patchState.channelB) ? patchState.channelB : {}),
+          };
+        }
+        if (isRecord(prevState.edge) || isRecord(patchState.edge)) {
+          mergedState.edge = {
+            ...(isRecord(prevState.edge) ? prevState.edge : {}),
+            ...(isRecord(patchState.edge) ? patchState.edge : {}),
+          };
+        }
+        const edgeObj = isRecord(mergedState.edge) ? mergedState.edge : undefined;
+        cur[idx] = {
+          ...prev,
+          hasDevice:
+            typeof mergedState.hasDevice === "boolean"
+              ? mergedState.hasDevice
+              : prev.hasDevice,
+          power: readNum(nextProps, "power") ?? prev.power,
+          intensityA: readNum(nextProps, "intensityA") ?? prev.intensityA,
+          intensityB: readNum(nextProps, "intensityB") ?? prev.intensityB,
+          maxA: readMaxFromChannelState(mergedState.channelA) ?? prev.maxA,
+          maxB: readMaxFromChannelState(mergedState.channelB) ?? prev.maxB,
+          pressure: readNum(nextProps, "pressure") ?? prev.pressure,
+          edgeState: readNum(edgeObj, "edgeState") ?? prev.edgeState,
+          rawProps: nextProps,
+          rawSlotState: mergedState,
+        };
+        changed = true;
+      }
+      if (changed) {
+        this.v4Clients.set(appClientId, cur);
+        this.syncV4DevicesSnapshot();
+      }
+      return;
+    }
+
+    if (payload.ev === "custom.action" && typeof payload.action === "number") {
+      this.update({ lastFeedback: { index: payload.action, at: Date.now() } });
+    }
   }
 
   async connectSocket() {
+    const requestedMode = this.snap.mode === "socket" ? "socket" : "socket4";
     this.disconnect();
+    this.activeSocketVersion = requestedMode === "socket4" ? "v4" : "v3";
+    if (this.snap.mode !== requestedMode) {
+      this.update({ mode: requestedMode });
+    }
+
     const baseWs = this.resolveSocketUrl();
     if (!baseWs) {
       this.update({
@@ -350,7 +643,15 @@ class DglabManager {
     }
 
     const finalWsBase = this.resolveSocketUrl() || baseWs;
-    this.update({ status: "waiting_qr", errorText: "", clientId: "", targetId: "", qrUrl: "" });
+    this.update({
+      status: "waiting_qr",
+      errorText: "",
+      clientId: "",
+      targetId: "",
+      qrUrl: "",
+      devices: [],
+      activeSlotId: "",
+    });
 
     try {
       const ws = new WebSocket(finalWsBase);
@@ -358,22 +659,88 @@ class DglabManager {
 
       ws.onmessage = (ev) => {
         if (this.ws !== ws) return;
-        let msg: {
-          type?: string;
-          clientId?: string;
-          targetId?: string;
-          message?: string;
-        };
+        let msg: Record<string, unknown>;
         try {
-          msg = JSON.parse(String(ev.data));
+          const parsed = JSON.parse(String(ev.data)) as unknown;
+          if (!isRecord(parsed)) return;
+          msg = parsed;
         } catch {
           return;
         }
 
-        if (msg.type === "bind") {
-          if (msg.message === "targetId" && msg.clientId) {
+        if (this.activeSocketVersion === "v4") {
+          const type = msg.type;
+          if (type === "hello" && typeof msg.clientId === "string") {
             const cId = msg.clientId;
-            const qrTarget = `https://www.dungeon-lab.com/app-download.php#DGLAB-SOCKET#${finalWsBase}/${cId}`;
+            this.v4Clients.clear();
+            this.v4PendingDevices.clear();
+            this.v4KnownStrength.clear();
+            this.update({
+              clientId: cId,
+              qrUrl: buildV4QrUrl(finalWsBase, cId),
+              status: "waiting_qr",
+            });
+            return;
+          }
+          if (type === "client_attached" && typeof msg.clientId === "string") {
+            const appClientId = msg.clientId;
+            if (!this.v4Clients.has(appClientId)) {
+              this.v4Clients.set(appClientId, []);
+            }
+            this.update({
+              targetId: this.snap.targetId || appClientId,
+              status: "paired",
+              errorText: "",
+            });
+            this.sendV4Rpc(appClientId, "devices.get");
+            this.startSocketPump();
+            return;
+          }
+          if (type === "client_disconnected" && typeof msg.clientId === "string") {
+            this.v4Clients.delete(msg.clientId);
+            const nextClientId = this.v4Clients.keys().next().value as
+              | string
+              | undefined;
+            if (!nextClientId) {
+              this.stopPumps();
+              this.update({
+                status: "waiting_qr",
+                targetId: "",
+                activeSlotId: "",
+                devices: [],
+                outputActive: false,
+              });
+            } else {
+              this.update({ targetId: nextClientId });
+              this.syncV4DevicesSnapshot();
+            }
+            return;
+          }
+          if (
+            type === "message" &&
+            typeof msg.clientId === "string" &&
+            isRecord(msg.data)
+          ) {
+            this.handleV4EventOrResp(msg.clientId, msg.data);
+            return;
+          }
+          if (type === "idle_timeout") {
+            this.stopPumps();
+            this.update({
+              status: "error",
+              errorText: "Pairing idle timeout (5 min)",
+              outputActive: false,
+            });
+            return;
+          }
+          return;
+        }
+
+        // Legacy Socket V3 message handling
+        if (msg.type === "bind") {
+          if (msg.message === "targetId" && typeof msg.clientId === "string") {
+            const cId = msg.clientId;
+            const qrTarget = `https://www.dungeon-lab.com/app-download.php#DGLAB-SOCKET#${finalWsBase.replace(/\/+$/, "")}/${cId}`;
             this.update({
               clientId: cId,
               qrUrl: qrTarget,
@@ -381,7 +748,11 @@ class DglabManager {
             });
             return;
           }
-          if (msg.message === "200" && msg.clientId && msg.targetId) {
+          if (
+            msg.message === "200" &&
+            typeof msg.clientId === "string" &&
+            typeof msg.targetId === "string"
+          ) {
             this.update({
               clientId: msg.clientId,
               targetId: msg.targetId,
@@ -445,6 +816,8 @@ class DglabManager {
             status: "disconnected",
             targetId: "",
             qrUrl: "",
+            devices: [],
+            activeSlotId: "",
             outputActive: false,
           });
         }
@@ -456,6 +829,7 @@ class DglabManager {
 
   private sendSocketMsg(message: string) {
     if (
+      this.activeSocketVersion !== "v3" ||
       !this.ws ||
       this.ws.readyState !== WebSocket.OPEN ||
       this.snap.status !== "paired" ||
@@ -491,6 +865,35 @@ class DglabManager {
         this.snap.bpm,
       ).map(frameToV3Hex);
       this.stepOffset += 5;
+
+      if (this.activeSocketVersion === "v4") {
+        this.forEachV4StimTarget((appClientId, dev) => {
+          if (this.snap.strengthA > 0) {
+            this.sendV4Rpc(appClientId, "device.op", {
+              s: dev.slotId,
+              t: 0,
+              c: 0,
+              p: 1,
+              d: 600,
+              im: true,
+              v: framesA,
+            });
+          }
+          if (this.snap.strengthB > 0) {
+            this.sendV4Rpc(appClientId, "device.op", {
+              s: dev.slotId,
+              t: 0,
+              c: 1,
+              p: 1,
+              d: 600,
+              im: true,
+              v: framesB,
+            });
+          }
+        });
+        return;
+      }
+
       if (this.snap.strengthA > 0) {
         this.sendSocketMsg(`pulse-A:${JSON.stringify(framesA)}`);
       }
@@ -649,6 +1052,51 @@ class DglabManager {
     }
   }
 
+  private sendV4ChannelTarget(ch: "A" | "B", next: number) {
+    if (this.activeSocketVersion !== "v4" || this.snap.status !== "paired") {
+      return;
+    }
+    const c = ch === "A" ? 0 : 1;
+    this.forEachV4StimTarget((appClientId, dev) => {
+      const known = this.v4KnownStrength.get(dev.slotId) ?? { a: 0, b: 0 };
+      const prev = ch === "A" ? known.a : known.b;
+      const updated = { ...known, ...(ch === "A" ? { a: next } : { b: next }) };
+      this.v4KnownStrength.set(dev.slotId, updated);
+      if (next <= 0) {
+        this.sendV4Rpc(appClientId, "device.op", {
+          s: dev.slotId,
+          t: 7,
+          c,
+          p: 1,
+          v: 0,
+        });
+      } else {
+        const delta = next - prev;
+        if (delta !== 0) {
+          this.sendV4Rpc(appClientId, "device.op", {
+            s: dev.slotId,
+            t: 3,
+            c,
+            p: 1,
+            v: delta,
+          });
+        }
+      }
+    });
+  }
+
+  private clearPairedPulseQueue() {
+    if (this.snap.status !== "paired") return;
+    if (this.activeSocketVersion === "v4") {
+      for (const appClientId of this.v4Clients.keys()) {
+        this.sendV4Rpc(appClientId, "device.op.clear");
+      }
+      return;
+    }
+    this.sendSocketMsg("clear-1");
+    this.sendSocketMsg("clear-2");
+  }
+
   disconnect() {
     this.stopPumps();
     if (this.ws) {
@@ -657,6 +1105,9 @@ class DglabManager {
       } catch {}
       this.ws = null;
     }
+    this.v4Clients.clear();
+    this.v4PendingDevices.clear();
+    this.v4KnownStrength.clear();
     this.bleDevice = null;
     this.c3Write = null;
     this.c2Ab2 = null;
@@ -667,6 +1118,8 @@ class DglabManager {
       clientId: "",
       targetId: "",
       qrUrl: "",
+      devices: [],
+      activeSlotId: "",
       outputActive: false,
       errorText: "",
     });
@@ -682,7 +1135,11 @@ class DglabManager {
     if (ch === "A") {
       this.update({ strengthA: next });
       if (this.snap.status === "paired") {
-        this.sendSocketMsg(`strength-1+2+${next}`);
+        if (this.activeSocketVersion === "v4") {
+          this.sendV4ChannelTarget("A", next);
+        } else {
+          this.sendSocketMsg(`strength-1+2+${next}`);
+        }
       }
       if (this.snap.prefs.channelBLink) {
         const linkedB = Math.max(
@@ -691,13 +1148,21 @@ class DglabManager {
         );
         this.update({ strengthB: linkedB });
         if (this.snap.status === "paired") {
-          this.sendSocketMsg(`strength-2+2+${linkedB}`);
+          if (this.activeSocketVersion === "v4") {
+            this.sendV4ChannelTarget("B", linkedB);
+          } else {
+            this.sendSocketMsg(`strength-2+2+${linkedB}`);
+          }
         }
       }
     } else {
       this.update({ strengthB: next });
       if (this.snap.status === "paired") {
-        this.sendSocketMsg(`strength-2+2+${next}`);
+        if (this.activeSocketVersion === "v4") {
+          this.sendV4ChannelTarget("B", next);
+        } else {
+          this.sendSocketMsg(`strength-2+2+${next}`);
+        }
       }
     }
   }
@@ -712,17 +1177,13 @@ class DglabManager {
       ...(ch === "A" || ch === "both" ? { waveA: wave } : {}),
       ...(ch === "B" || ch === "both" ? { waveB: wave } : {}),
     }, true);
-    if (this.snap.status === "paired") {
-      this.sendSocketMsg("clear-1");
-      this.sendSocketMsg("clear-2");
-    }
+    this.clearPairedPulseQueue();
   }
 
   setOutputActive(active: boolean) {
     this.update({ outputActive: active });
-    if (!active && this.snap.status === "paired") {
-      this.sendSocketMsg("clear-1");
-      this.sendSocketMsg("clear-2");
+    if (!active) {
+      this.clearPairedPulseQueue();
     }
   }
 
@@ -737,10 +1198,31 @@ class DglabManager {
       outputActive: false,
     });
     if (this.snap.status === "paired") {
-      this.sendSocketMsg("strength-1+2+0");
-      this.sendSocketMsg("strength-2+2+0");
-      this.sendSocketMsg("clear-1");
-      this.sendSocketMsg("clear-2");
+      if (this.activeSocketVersion === "v4") {
+        this.forEachV4StimTarget((appClientId, dev) => {
+          this.v4KnownStrength.set(dev.slotId, { a: 0, b: 0 });
+          this.sendV4Rpc(appClientId, "device.op", {
+            s: dev.slotId,
+            t: 7,
+            c: 0,
+            p: 2,
+            v: 0,
+          });
+          this.sendV4Rpc(appClientId, "device.op", {
+            s: dev.slotId,
+            t: 7,
+            c: 1,
+            p: 2,
+            v: 0,
+          });
+        });
+        this.clearPairedPulseQueue();
+      } else {
+        this.sendSocketMsg("strength-1+2+0");
+        this.sendSocketMsg("strength-2+2+0");
+        this.sendSocketMsg("clear-1");
+        this.sendSocketMsg("clear-2");
+      }
     }
   }
 
@@ -773,11 +1255,35 @@ class DglabManager {
     }
 
     if (this.snap.status === "paired") {
-      this.sendSocketMsg("clear-1");
-      this.sendSocketMsg("clear-2");
       const burstFrames = buildWaveFrames(wave, 0, 12, 160, 100).map(frameToV3Hex);
-      this.sendSocketMsg(`pulse-A:${JSON.stringify(burstFrames)}`);
-      this.sendSocketMsg(`pulse-B:${JSON.stringify(burstFrames)}`);
+      if (this.activeSocketVersion === "v4") {
+        this.clearPairedPulseQueue();
+        this.forEachV4StimTarget((appClientId, dev) => {
+          this.sendV4Rpc(appClientId, "device.op", {
+            s: dev.slotId,
+            t: 0,
+            c: 0,
+            p: 2,
+            d: durationMs,
+            im: true,
+            v: burstFrames,
+          });
+          this.sendV4Rpc(appClientId, "device.op", {
+            s: dev.slotId,
+            t: 0,
+            c: 1,
+            p: 2,
+            d: durationMs,
+            im: true,
+            v: burstFrames,
+          });
+        });
+      } else {
+        this.sendSocketMsg("clear-1");
+        this.sendSocketMsg("clear-2");
+        this.sendSocketMsg(`pulse-A:${JSON.stringify(burstFrames)}`);
+        this.sendSocketMsg(`pulse-B:${JSON.stringify(burstFrames)}`);
+      }
     }
 
     this.burstRestoreTimer = window.setTimeout(() => {
@@ -808,10 +1314,7 @@ class DglabManager {
       this.update({ outputActive: false, bpm: cue.bpm ?? 60 });
       this.setChannelStrength("A", 0);
       this.setChannelStrength("B", 0);
-      if (this.snap.status === "paired") {
-        this.sendSocketMsg("clear-1");
-        this.sendSocketMsg("clear-2");
-      }
+      this.clearPairedPulseQueue();
       return;
     }
 

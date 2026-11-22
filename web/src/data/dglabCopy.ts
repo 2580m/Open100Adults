@@ -199,12 +199,22 @@ export const DGLAB_COPY: Record<
       connected_ble: string;
       error: string;
     };
-    tabSocket: string;
+    tabSocket4: string;
+    tabSocket3: string;
     tabBle3: string;
     tabBle2: string;
     socketLead: string;
+    socket4Lead: string;
     wsModeLabel: string;
-    wsModes: { auto: string; lan: string; custom: string };
+    wsModes: { auto: string; official: string; lan: string; custom: string };
+    devicesTitle: string;
+    noV4Devices: string;
+    deviceTypes: {
+      COYOTE_030: string;
+      COYOTE_020: string;
+      OVC_1: string;
+      BMTR_1: string;
+    };
     customWsPlaceholder: string;
     connectSocket: string;
     disconnect: string;
@@ -249,9 +259,9 @@ export const DGLAB_COPY: Record<
     pageTitle: "DG-LAB Pulse Console",
     pageEyebrow: "Open-Source Hardware Integration",
     pageLead:
-      "Connect Coyote 2.0/3.0 via the official DG-LAB App Socket QR code or directly over Web Bluetooth. Zero third-party ads, dual safety caps enforced locally.",
+      "Connect DG-LAB 4.0 / 3.0 / 2.0 via official DG-LAB App Socket V4 / V3 QR code or directly over Web Bluetooth. Zero third-party ads, dual safety caps enforced locally.",
     cardTitle: "DG-LAB E-Stim",
-    cardSub: "App Socket QR · BLE 3.0/2.0",
+    cardSub: "App Socket V4/V3 QR · BLE 3.0/2.0",
     expand: "Configure",
     collapse: "Hide",
     status: {
@@ -262,18 +272,30 @@ export const DGLAB_COPY: Record<
       connected_ble: "BLE connected",
       error: "Connection error",
     },
-    tabSocket: "App Socket QR",
+    tabSocket4: "App QR (Socket V4)",
+    tabSocket3: "Socket V3 (Legacy)",
     tabBle3: "BLE 3.0 Direct",
     tabBle2: "BLE 2.0 Direct",
     socketLead:
-      "Pairs with the official DG-LAB iOS/Android App over this server's built-in /dglab-ws relay.",
+      "Pairs with DG-LAB App via Socket V3 over this server's /dglab-ws relay or the official V3 relay.",
+    socket4Lead:
+      "DG-LAB 4.0 official protocol (/dglab-ws/v4 or wss://trex.dungeon-lab.cn/v4). Supports Coyote 2.0/3.0, Opossum (OVC), and Lynx (BMTR).",
     wsModeLabel: "Relay endpoint",
     wsModes: {
-      auto: "Auto (Tunnel WSS / Current Host)",
+      auto: "Auto (Tunnel / Built-in)",
+      official: "Official Cloud (V4/V3)",
       lan: "Current LAN / Host",
       custom: "Custom WS URL",
     },
-    customWsPlaceholder: "wss://your-relay.example.com/dglab-ws",
+    devicesTitle: "App-exposed devices",
+    noV4Devices: "Paired with App, waiting for hardware device to connect inside DG-LAB App…",
+    deviceTypes: {
+      COYOTE_030: "Coyote 3.0",
+      COYOTE_020: "Coyote 2.0",
+      OVC_1: "Opossum",
+      BMTR_1: "Lynx Sensor",
+    },
+    customWsPlaceholder: "wss://your-relay.example.com/dglab-ws/v4",
     connectSocket: "Generate Pairing QR",
     disconnect: "Disconnect",
     qrHint:
@@ -281,7 +303,7 @@ export const DGLAB_COPY: Record<
     copySocketUrl: "Copy Socket Link",
     copied: "Copied",
     staticSocketWarn:
-      "Running in static GitHub Pages mode without a built-in WebSocket relay. Choose Custom WS URL or switch to BLE Direct.",
+      "GitHub Pages static hosting has no local LAN relay; pick Auto / Official Cloud, enter a Custom WS URL, or use BLE Direct.",
     bleLead:
       "Connect directly from Chrome/Edge on desktop or Android without opening the mobile App.",
     bleUnsupported:
@@ -322,9 +344,9 @@ export const DGLAB_COPY: Record<
     pageTitle: "DG-LAB 脉冲控制台",
     pageEyebrow: "开源硬件联动",
     pageLead:
-      "支持郊狼 2.0 / 3.0：既可用 DG-LAB 官方 App 扫码接入内置 `/dglab-ws` 中继（iOS / Android 全通用），也支持浏览器 Web Bluetooth 蓝牙直连。全程零广告、双端安全上限本地锁死。",
+      "全面支持 DG-LAB 4.0（Socket V4）及兼容 V3 / 蓝牙 3.0 & 2.0：支持 App 扫码直连内置中继或官方云节点（郊狼/负鼠/灵猫），也支持浏览器 Web Bluetooth 直连。",
     cardTitle: "DG-LAB 郊狼联动",
-    cardSub: "App 扫码联机 · 蓝牙直连 3.0 / 2.0",
+    cardSub: "App 扫码 V4/V3 · 蓝牙直连 3.0 / 2.0",
     expand: "展开配置",
     collapse: "收起",
     status: {
@@ -335,18 +357,30 @@ export const DGLAB_COPY: Record<
       connected_ble: "蓝牙已直连",
       error: "连接异常",
     },
-    tabSocket: "App 扫码 (Socket v3)",
+    tabSocket4: "App 扫码 (Socket V4)",
+    tabSocket3: "旧版 Socket V3",
     tabBle3: "蓝牙直连 3.0",
     tabBle2: "蓝牙直连 2.0",
     socketLead:
-      "通过内置 `/dglab-ws` 协议中继与官方 DG-LAB App 配对（iOS 与 Android 均可用，局域网或 Cloudflare 隧道都能连）。",
+      "通过内置 `/dglab-ws` 协议或官方 V3 中继与 DG-LAB App 配对（兼容旧版控制端）。",
+    socket4Lead:
+      "DG-LAB 4.0 官方协议（内置 `/dglab-ws/v4` 或官方云 `wss://trex.dungeon-lab.cn/v4`），支持郊狼 2.0/3.0、负鼠、灵猫等多设备。",
     wsModeLabel: "Socket 中继地址",
     wsModes: {
-      auto: "自动（优先隧道 WSS / 当前域名）",
-      lan: "当前局域网 / 本机地址",
+      auto: "自动（隧道 / 内置中继）",
+      official: "官方云中继 (V4/V3)",
+      lan: "当前局域网 / 本机",
       custom: "自定义 WS 地址",
     },
-    customWsPlaceholder: "wss://你的中继域名/dglab-ws",
+    devicesTitle: "App 已连接硬件",
+    noV4Devices: "App 已连接，请在手机 DG-LAB 4.0 App 内连接郊狼或负鼠设备…",
+    deviceTypes: {
+      COYOTE_030: "郊狼 3.0",
+      COYOTE_020: "郊狼 2.0",
+      OVC_1: "负鼠控制器",
+      BMTR_1: "灵猫传感器",
+    },
+    customWsPlaceholder: "wss://你的中继域名/dglab-ws/v4",
     connectSocket: "生成配对二维码",
     disconnect: "断开连接",
     qrHint:
@@ -354,7 +388,7 @@ export const DGLAB_COPY: Record<
     copySocketUrl: "复制配对链接",
     copied: "已复制",
     staticSocketWarn:
-      "当前为 GitHub Pages 纯静态版本，无内置 WebSocket 服务端；请在下方填写自定义 WS 地址或使用「蓝牙直连」。",
+      "当前为 GitHub Pages 纯静态版本，无内置局域网中继；可选「自动 / 官方云中继」、填写自定义 WS 地址或直接用蓝牙直连。",
     bleLead:
       "电脑端 Chrome / Edge 或安卓 Chrome 可绕过手机 App 直接通过蓝牙连接郊狼主机（Pages 纯静态版也可使用）。",
     bleUnsupported:

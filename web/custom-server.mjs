@@ -854,6 +854,177 @@ const dglabHeartbeatTimer = setInterval(() => {
 }, 30_000);
 dglabHeartbeatTimer.unref?.();
 
+// ---- DG-LAB Socket Control V4 Relay (/dglab-ws/v4) ----
+const DGLAB_V4_IDLE_MS = 5 * 60_000;
+const DGLAB_V4_CLOSE_CONTROLLER_DISCONNECTED = 4000;
+const DGLAB_V4_CLOSE_CONTROLLER_NOT_FOUND = 4001;
+const DGLAB_V4_CLOSE_IDLE_TIMEOUT = 4002;
+
+const dglabV4Sockets = new Set();
+const dglabV4Controllers = new Map(); // controllerClientId -> ws
+const dglabV4Controlled = new Map(); // controllerWs -> Map<appClientId, appWs>
+const dglabV4ControllerOf = new Map(); // appWs -> controllerWs
+const dglabV4IdleTimers = new Map(); // controllerWs -> timeout
+
+function createDglabV4Id() {
+  let id;
+  do {
+    id = crypto.randomBytes(4).toString("hex");
+  } while (dglabV4Controllers.has(id));
+  return id;
+}
+
+function clearDglabV4Idle(ctrlWs) {
+  const t = dglabV4IdleTimers.get(ctrlWs);
+  if (t) {
+    clearTimeout(t);
+    dglabV4IdleTimers.delete(ctrlWs);
+  }
+}
+
+function startDglabV4Idle(ctrlWs) {
+  clearDglabV4Idle(ctrlWs);
+  const timer = setTimeout(() => {
+    dglabV4IdleTimers.delete(ctrlWs);
+    if (ctrlWs.readyState === 1) {
+      sendWs(ctrlWs, { type: "idle_timeout" });
+      try {
+        ctrlWs.close(DGLAB_V4_CLOSE_IDLE_TIMEOUT, "idle_timeout");
+      } catch {}
+    }
+  }, DGLAB_V4_IDLE_MS);
+  timer.unref?.();
+  dglabV4IdleTimers.set(ctrlWs, timer);
+}
+
+const dglabV4Wss = new WebSocketServer({ noServer: true });
+
+dglabV4Wss.on("connection", (ws, _req, tid) => {
+  const clientId = createDglabV4Id();
+  ws._dglabV4Id = clientId;
+  dglabV4Sockets.add(ws);
+  sendWs(ws, { type: "hello", clientId });
+
+  const targetTid = String(tid || "").trim();
+  if (!targetTid) {
+    dglabV4Controllers.set(clientId, ws);
+    dglabV4Controlled.set(ws, new Map());
+    startDglabV4Idle(ws);
+  } else {
+    const ctrlWs = dglabV4Controllers.get(targetTid);
+    const controlledMap = ctrlWs ? dglabV4Controlled.get(ctrlWs) : null;
+    if (!ctrlWs || ctrlWs.readyState !== 1 || !controlledMap) {
+      sendWs(ws, { type: "error", code: "controller_not_found" });
+      try {
+        ws.close(DGLAB_V4_CLOSE_CONTROLLER_NOT_FOUND, "controller_not_found");
+      } catch {}
+    } else {
+      controlledMap.set(clientId, ws);
+      dglabV4ControllerOf.set(ws, ctrlWs);
+      clearDglabV4Idle(ctrlWs);
+      sendWs(ws, { type: "controller_attached", clientId: targetTid });
+      sendWs(ctrlWs, { type: "client_attached", clientId });
+    }
+  }
+
+  ws.on("message", (raw) => {
+    let msg;
+    try {
+      msg = JSON.parse(String(raw));
+    } catch {
+      return;
+    }
+    if (!msg || typeof msg !== "object" || Array.isArray(msg)) return;
+    if (msg.type === "pong") return;
+    if (msg.type === "ping") {
+      sendWs(ws, { type: "pong", ts: Date.now() });
+      return;
+    }
+    if (msg.type !== "message") return;
+
+    if (dglabV4Controlled.has(ws)) {
+      if (typeof msg.clientId !== "string" || !msg.clientId) {
+        sendWs(ws, {
+          type: "error",
+          code: "bad_request",
+          message: "message.clientId is required",
+        });
+        return;
+      }
+      const appWs = dglabV4Controlled.get(ws)?.get(msg.clientId);
+      if (appWs && appWs.readyState === 1) {
+        sendWs(appWs, { type: "message", data: msg.data });
+      } else {
+        sendWs(ws, {
+          type: "error",
+          code: "client_not_found",
+          clientId: msg.clientId,
+        });
+      }
+      return;
+    }
+
+    const ctrlWs = dglabV4ControllerOf.get(ws);
+    if (ctrlWs && ctrlWs.readyState === 1) {
+      sendWs(ctrlWs, { type: "message", clientId, data: msg.data });
+    }
+  });
+
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    dglabV4Sockets.delete(ws);
+
+    if (dglabV4Controlled.has(ws)) {
+      clearDglabV4Idle(ws);
+      dglabV4Controllers.delete(clientId);
+      const clients = dglabV4Controlled.get(ws);
+      dglabV4Controlled.delete(ws);
+      if (clients) {
+        for (const cWs of clients.values()) {
+          dglabV4ControllerOf.delete(cWs);
+          if (cWs.readyState === 1) {
+            sendWs(cWs, { type: "controller_disconnected", clientId });
+            try {
+              cWs.close(
+                DGLAB_V4_CLOSE_CONTROLLER_DISCONNECTED,
+                "controller_disconnected",
+              );
+            } catch {}
+          }
+        }
+      }
+      return;
+    }
+
+    const ctrlWs = dglabV4ControllerOf.get(ws);
+    if (ctrlWs) {
+      dglabV4ControllerOf.delete(ws);
+      const clients = dglabV4Controlled.get(ctrlWs);
+      clients?.delete(clientId);
+      if (ctrlWs.readyState === 1) {
+        sendWs(ctrlWs, { type: "client_disconnected", clientId });
+        if (!clients || clients.size === 0) {
+          startDglabV4Idle(ctrlWs);
+        }
+      }
+    }
+  };
+
+  ws.on("close", cleanup);
+  ws.on("error", cleanup);
+});
+
+const dglabV4HeartbeatTimer = setInterval(() => {
+  for (const ws of dglabV4Sockets) {
+    if (ws.readyState === 1) {
+      sendWs(ws, { type: "heartbeat" });
+    }
+  }
+}, 30_000);
+dglabV4HeartbeatTimer.unref?.();
+
 // ---- Boot Next.js App + HTTP/WS Server ----
 const app = next({ dev, hostname, port, dir: __dirname });
 const handle = app.getRequestHandler();
@@ -891,8 +1062,11 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, {
       ok: true,
       wsPath: "/dglab-ws",
+      wsV4Path: "/dglab-ws/v4",
       activeClients: dglabClients.size,
       activePairs: dglabRelations.size,
+      activeV4Controllers: dglabV4Controllers.size,
+      activeV4Clients: dglabV4ControllerOf.size,
       ...getPublicOriginInfo(),
     });
   }
@@ -933,8 +1107,28 @@ server.on("upgrade", (req, socket, head) => {
     return;
   }
 
+  if (/^\/dglab-ws\/v4\/?$/.test(url.pathname)) {
+    const tid =
+      url.searchParams.get("targetId") ??
+      url.searchParams.get("tid") ??
+      "";
+    dglabV4Wss.handleUpgrade(req, socket, head, (ws) => {
+      dglabV4Wss.emit("connection", ws, req, tid);
+    });
+    return;
+  }
+
   const dglabMatch = url.pathname.match(/^\/dglab-ws(?:\/([A-Za-z0-9_-]+))?$/);
   if (dglabMatch) {
+    const vParam = url.searchParams.get("v");
+    const tidParam =
+      url.searchParams.get("targetId") ?? url.searchParams.get("tid");
+    if (vParam === "4" || (!dglabMatch[1] && tidParam !== null)) {
+      dglabV4Wss.handleUpgrade(req, socket, head, (ws) => {
+        dglabV4Wss.emit("connection", ws, req, tidParam || "");
+      });
+      return;
+    }
     dglabWss.handleUpgrade(req, socket, head, (ws) => {
       dglabWss.emit("connection", ws, req, dglabMatch[1] || "");
     });
