@@ -203,6 +203,7 @@ export const DGLAB_COPY: Record<
     tabSocket3: string;
     tabBle3: string;
     tabBle2: string;
+    tabButtplug: string;
     socketLead: string;
     socket4Lead: string;
     wsModeLabel: string;
@@ -215,6 +216,18 @@ export const DGLAB_COPY: Record<
       OVC_1: string;
       BMTR_1: string;
     };
+    buttplugLead: string;
+    buttplugWsLabel: string;
+    buttplugConnect: string;
+    buttplugConnecting: string;
+    buttplugScan: string;
+    buttplugScanning: string;
+    buttplugNoDevices: string;
+    buttplugMaxCap: string;
+    buttplugIntensity: string;
+    buttplugCmds: { Scalar: string; Linear: string; Rotate: string };
+    buttplugEnabled: string;
+    buttplugPaused: string;
     customWsPlaceholder: string;
     connectSocket: string;
     disconnect: string;
@@ -259,9 +272,9 @@ export const DGLAB_COPY: Record<
     pageTitle: "DG-LAB Pulse Console",
     pageEyebrow: "Open-Source Hardware Integration",
     pageLead:
-      "Connect DG-LAB 4.0 / 3.0 / 2.0 via official DG-LAB App Socket V4 / V3 QR code or directly over Web Bluetooth. Zero third-party ads, dual safety caps enforced locally.",
-    cardTitle: "DG-LAB E-Stim",
-    cardSub: "App Socket V4/V3 QR · BLE 3.0/2.0",
+      "Connect DG-LAB 4.0 / 3.0 / 2.0 (App QR V4/V3 or Web Bluetooth) and 750+ Buttplug.io / Intiface Central toys (Lovense, The Handy, OSR2, We-Vibe). Zero ads, local safety caps.",
+    cardTitle: "DG-LAB & Hardware Sync",
+    cardSub: "App V4/V3 · BLE 3.0/2.0 · Buttplug.io",
     expand: "Configure",
     collapse: "Hide",
     status: {
@@ -276,6 +289,25 @@ export const DGLAB_COPY: Record<
     tabSocket3: "Socket V3 (Legacy)",
     tabBle3: "BLE 3.0 Direct",
     tabBle2: "BLE 2.0 Direct",
+    tabButtplug: "Buttplug.io (750+ Toys)",
+    buttplugLead:
+      "Connect to Intiface Central (ws://127.0.0.1:12345) via Buttplug Protocol v3 to drive Lovense, The Handy, We-Vibe, Kiiroo, Vorze & OSR2 alongside DG-LAB.",
+    buttplugWsLabel: "Intiface Central WebSocket",
+    buttplugConnect: "Connect Intiface",
+    buttplugConnecting: "Connecting…",
+    buttplugScan: "Scan Devices",
+    buttplugScanning: "Scanning… (click to stop)",
+    buttplugNoDevices:
+      "Connected to Intiface. Wake your Bluetooth / serial toy and wait for it to appear here…",
+    buttplugMaxCap: "Buttplug safety limit",
+    buttplugIntensity: "Output intensity",
+    buttplugCmds: {
+      Scalar: "Vibrate",
+      Linear: "Stroke",
+      Rotate: "Rotate",
+    },
+    buttplugEnabled: "Active",
+    buttplugPaused: "Muted",
     socketLead:
       "Pairs with DG-LAB App via Socket V3 over this server's /dglab-ws relay or the official V3 relay.",
     socket4Lead:
@@ -344,9 +376,9 @@ export const DGLAB_COPY: Record<
     pageTitle: "DG-LAB 脉冲控制台",
     pageEyebrow: "开源硬件联动",
     pageLead:
-      "全面支持 DG-LAB 4.0（Socket V4）及兼容 V3 / 蓝牙 3.0 & 2.0：支持 App 扫码直连内置中继或官方云节点（郊狼/负鼠/灵猫），也支持浏览器 Web Bluetooth 直连。",
-    cardTitle: "DG-LAB 郊狼联动",
-    cardSub: "App 扫码 V4/V3 · 蓝牙直连 3.0 / 2.0",
+      "全面支持 DG-LAB 4.0/3.0/2.0（App 扫码 V4/V3 或蓝牙直连）以及开源 Buttplug.io / Intiface Central（通吃 Lovense、The Handy、OSR2 等 750+ 成人硬件），与站内游戏及远控实时联动。",
+    cardTitle: "DG-LAB · 开源玩具联动",
+    cardSub: "郊狼 V4/V3 · 蓝牙 3.0/2.0 · Buttplug.io",
     expand: "展开配置",
     collapse: "收起",
     status: {
@@ -361,6 +393,25 @@ export const DGLAB_COPY: Record<
     tabSocket3: "旧版 Socket V3",
     tabBle3: "蓝牙直连 3.0",
     tabBle2: "蓝牙直连 2.0",
+    tabButtplug: "Buttplug.io (通用玩具)",
+    buttplugLead:
+      "连接本地或手机运行的开源桥接器 Intiface Central（默认 ws://127.0.0.1:12345），即可驱动 Lovense、The Handy、跳蛋、伸缩飞机杯等 750+ 款硬件，可与郊狼同时联动。",
+    buttplugWsLabel: "Intiface Central WS 地址",
+    buttplugConnect: "连接 Intiface",
+    buttplugConnecting: "连接中…",
+    buttplugScan: "扫描设备",
+    buttplugScanning: "扫描中（点击停止）",
+    buttplugNoDevices:
+      "已连上 Intiface，请开启玩具蓝牙等待扫描识别…",
+    buttplugMaxCap: "通用玩具安全上限",
+    buttplugIntensity: "当前输出强度",
+    buttplugCmds: {
+      Scalar: "震动",
+      Linear: "伸缩",
+      Rotate: "旋转",
+    },
+    buttplugEnabled: "参与联动",
+    buttplugPaused: "已屏蔽",
     socketLead:
       "通过内置 `/dglab-ws` 协议或官方 V3 中继与 DG-LAB App 配对（兼容旧版控制端）。",
     socket4Lead:

@@ -8,8 +8,14 @@ import {
   type WavePresetKey,
 } from "@/data/dglabCopy";
 import { IS_STATIC_EXPORT } from "@/data/tools";
+import { buttplugManager } from "@/lib/buttplug";
 
-export type DglabTransportMode = "socket4" | "socket" | "ble3" | "ble2";
+export type DglabTransportMode =
+  | "socket4"
+  | "socket"
+  | "ble3"
+  | "ble2"
+  | "buttplug";
 export type DglabWsEndpointMode = "auto" | "official" | "lan" | "custom";
 export type DglabConnectionStatus =
   | "disconnected"
@@ -66,6 +72,8 @@ export interface DglabSnapshot {
   bpm: number;
   lastFeedback: { index: number; at: number } | null;
   prefs: DglabPrefs;
+  buttplugConnected: boolean;
+  buttplugDeviceCount: number;
   bleSupported: boolean;
   secureContext: boolean;
 }
@@ -254,6 +262,8 @@ class DglabManager {
       bpm: 90,
       lastFeedback: null,
       prefs: { ...DEFAULT_PREFS },
+      buttplugConnected: false,
+      buttplugDeviceCount: 0,
       bleSupported: false,
       secureContext: false,
     };
@@ -302,7 +312,8 @@ class DglabManager {
           p.mode === "socket4" ||
           p.mode === "socket" ||
           p.mode === "ble3" ||
-          p.mode === "ble2"
+          p.mode === "ble2" ||
+          p.mode === "buttplug"
         ) {
           savedMode = p.mode;
         }
@@ -311,6 +322,23 @@ class DglabManager {
         }
       }
     } catch {}
+
+    buttplugManager.hydrate();
+    const bpInit = buttplugManager.getSnapshot();
+    buttplugManager.subscribe(() => {
+      const bp = buttplugManager.getSnapshot();
+      const bpConn = bp.status === "connected";
+      const bpCount = bp.devices.length;
+      if (
+        bpConn !== this.snap.buttplugConnected ||
+        bpCount !== this.snap.buttplugDeviceCount
+      ) {
+        this.update({
+          buttplugConnected: bpConn,
+          buttplugDeviceCount: bpCount,
+        });
+      }
+    });
 
     this.snap = {
       ...this.snap,
@@ -322,6 +350,8 @@ class DglabManager {
       wsEndpointMode: savedEndpointMode,
       customWsUrl: savedCustomWs,
       prefs: savedPrefs,
+      buttplugConnected: bpInit.status === "connected",
+      buttplugDeviceCount: bpInit.devices.length,
       bleSupported: Boolean(nav.bluetooth),
       secureContext: Boolean(window.isSecureContext),
     };
@@ -369,14 +399,20 @@ class DglabManager {
 
   getSnapshot = (): DglabSnapshot => this.snap;
 
-  isConnected(): boolean {
+  isDglabConnected(): boolean {
     return (
       this.snap.status === "paired" || this.snap.status === "connected_ble"
     );
   }
 
+  isConnected(): boolean {
+    return this.isDglabConnected() || buttplugManager.isConnected();
+  }
+
   setMode(mode: DglabTransportMode) {
-    this.disconnect();
+    if (mode !== "buttplug" && this.snap.mode !== "buttplug") {
+      this.disconnect();
+    }
     this.update({ mode, errorText: "" }, true);
   }
 
@@ -1178,12 +1214,18 @@ class DglabManager {
       ...(ch === "B" || ch === "both" ? { waveB: wave } : {}),
     }, true);
     this.clearPairedPulseQueue();
+    if (buttplugManager.isConnected()) {
+      buttplugManager.setWavePreset(wave);
+    }
   }
 
   setOutputActive(active: boolean) {
     this.update({ outputActive: active });
     if (!active) {
       this.clearPairedPulseQueue();
+    }
+    if (buttplugManager.isConnected()) {
+      buttplugManager.setOutputActive(active);
     }
   }
 
@@ -1224,10 +1266,67 @@ class DglabManager {
         this.sendSocketMsg("clear-2");
       }
     }
+    buttplugManager.emergencyStop();
+  }
+
+  setRemotePercent(pct: number, bPct?: number) {
+    const safePct = Math.max(0, Math.min(100, Math.round(pct)));
+    if (this.isDglabConnected()) {
+      const capA = Math.min(this.snap.maxA, this.snap.appLimitA);
+      const capB = Math.min(this.snap.maxB, this.snap.appLimitB);
+      this.setOutputActive(safePct > 0);
+      this.setChannelStrength("A", Math.round((capA * safePct) / 100));
+      if (!this.snap.prefs.channelBLink) {
+        const safeB = Math.max(0, Math.min(100, Math.round(bPct ?? safePct)));
+        this.setChannelStrength("B", Math.round((capB * safeB) / 100));
+      }
+    }
+    if (buttplugManager.isConnected()) {
+      const bp = buttplugManager.getSnapshot();
+      buttplugManager.setOutputActive(safePct > 0);
+      buttplugManager.setIntensity(Math.round((bp.maxIntensity * safePct) / 100));
+    }
+  }
+
+  getRemoteTelemetry(): {
+    on: true;
+    allowRemote: boolean;
+    a: number;
+    b: number;
+    maxA: number;
+    maxB: number;
+    wave: WavePresetKey;
+  } | null {
+    if (this.isDglabConnected()) {
+      return {
+        on: true,
+        allowRemote: this.snap.prefs.allowRemote,
+        a: this.snap.strengthA,
+        b: this.snap.strengthB,
+        maxA: Math.min(this.snap.maxA, this.snap.appLimitA),
+        maxB: Math.min(this.snap.maxB, this.snap.appLimitB),
+        wave: this.snap.waveA,
+      };
+    }
+    if (buttplugManager.isConnected()) {
+      const bp = buttplugManager.getSnapshot();
+      return {
+        on: true,
+        allowRemote: this.snap.prefs.allowRemote,
+        a: bp.intensity,
+        b: bp.intensity,
+        maxA: bp.maxIntensity,
+        maxB: bp.maxIntensity,
+        wave: bp.wave,
+      };
+    }
+    return null;
   }
 
   triggerBurst(wave: WavePresetKey, durationMs = 1500, boostPct = 70) {
     if (!this.isConnected()) return;
+    buttplugManager.triggerBurst(wave, durationMs, boostPct);
+    if (!this.isDglabConnected()) return;
     if (this.burstRestoreTimer) {
       window.clearTimeout(this.burstRestoreTimer);
     }
@@ -1302,6 +1401,9 @@ class DglabManager {
 
   applyGameCue(cue: DglabGameCue) {
     if (!this.isConnected() || !this.snap.prefs.autoSync) return;
+
+    buttplugManager.applyGameCue(cue, this.snap.prefs.zeroOnStop);
+    if (!this.isDglabConnected()) return;
 
     if (!cue.active) {
       this.setOutputActive(false);

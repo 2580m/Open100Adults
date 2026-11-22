@@ -648,18 +648,8 @@ export function SundomeGame({
         level: arousalRef.current || undefined,
         at: nextCmdAtRef.current || undefined,
         ...(wireOutcome ? { outcome: wireOutcome } : {}),
-        ...(dglabManager.isConnected()
-          ? {
-              dglab: {
-                on: true,
-                allowRemote: dglabRef.current.prefs.allowRemote,
-                a: dglabRef.current.strengthA,
-                b: dglabRef.current.strengthB,
-                maxA: Math.min(dglabRef.current.maxA, dglabRef.current.appLimitA),
-                maxB: Math.min(dglabRef.current.maxB, dglabRef.current.appLimitB),
-                wave: dglabRef.current.waveA,
-              },
-            }
+        ...(dglabManager.getRemoteTelemetry()
+          ? { dglab: dglabManager.getRemoteTelemetry()! }
           : {}),
       };
     },
@@ -860,17 +850,7 @@ export function SundomeGame({
             } else if (msg.k === "wave" && msg.wave) {
               dglabManager.setWavePreset(msg.wave, "both");
             } else if (msg.k === "pct" && typeof msg.pct === "number") {
-              const snapNow = dglabRef.current;
-              const capA = Math.min(snapNow.maxA, snapNow.appLimitA);
-              const capB = Math.min(snapNow.maxB, snapNow.appLimitB);
-              dglabManager.setOutputActive(msg.pct > 0);
-              dglabManager.setChannelStrength("A", Math.round((capA * msg.pct) / 100));
-              if (!snapNow.prefs.channelBLink) {
-                dglabManager.setChannelStrength(
-                  "B",
-                  Math.round((capB * (msg.bPct ?? msg.pct)) / 100),
-                );
-              }
+              dglabManager.setRemotePercent(msg.pct, msg.bPct);
             } else if (msg.k === "burst") {
               dglabManager.triggerBurst(msg.wave ?? "punish", 1500, msg.pct ?? 85);
             }
@@ -954,6 +934,7 @@ export function SundomeGame({
     dglabSnap.prefs.autoSync,
     dglabSnap.prefs.zeroOnStop,
     dglabSnap.status,
+    dglabSnap.buttplugConnected,
     phase,
   ]);
 
@@ -2085,14 +2066,19 @@ export function SundomeGame({
 
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               {(dglabSnap.status === "paired" ||
-                dglabSnap.status === "connected_ble") && (
+                dglabSnap.status === "connected_ble" ||
+                dglabSnap.buttplugConnected) && (
                 <button
                   type="button"
                   onClick={() => dglabManager.emergencyStop()}
                   data-sundome-dglab-estop
                   className="inline-flex h-7 cursor-pointer items-center justify-center rounded-full border border-rose-400/60 bg-rose-600/35 px-2.5 text-xs font-bold text-rose-100 hover:bg-rose-600/55"
                 >
-                  A:{dglabSnap.strengthA} · {locale === "zh" ? "急停" : "Stop"}
+                  {dglabSnap.status === "paired" ||
+                  dglabSnap.status === "connected_ble"
+                    ? `A:${dglabSnap.strengthA} · `
+                    : `BP:${dglabSnap.buttplugDeviceCount} · `}
+                  {locale === "zh" ? "急停" : "Stop"}
                 </button>
               )}
               {videoUrl && (
