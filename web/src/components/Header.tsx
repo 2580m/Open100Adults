@@ -94,6 +94,17 @@ export function Header({ locale }: { locale: Locale }) {
             aria-label={dict.header.navAria}
             className="ml-auto hidden items-center gap-1 lg:flex"
           >
+            <Link
+              href={homeHref}
+              data-header-bar-item="home"
+              className={`whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-medium transition-colors ${
+                isActive("")
+                  ? "bg-category-bg-hover text-foreground"
+                  : "text-foreground-soft hover:bg-category-bg-hover hover:text-foreground"
+              }`}
+            >
+              {locale === "zh" ? "主页" : "Home"}
+            </Link>
             {HEADER_BAR_TOOLS.map((key) => {
               const href = localePath(locale, TOOL_META[key].path);
               return (
