@@ -5,6 +5,7 @@ export const TOOL_KEYS = [
   "remote",
   "remoteList",
   "dglab",
+  "buttplug",
   "story",
   "streak",
   "size",
@@ -35,6 +36,7 @@ export const TOOL_META: Record<ToolKey, ToolMeta> = {
   remote: { path: "/sundome/remote", icon: "/icons/play/remote.webp" },
   remoteList: { path: "/sundome/remote/list", icon: "/icons/play/remote.webp" },
   dglab: { path: "/dglab", icon: "/icons/play/remote.webp" },
+  buttplug: { path: "/buttplug", icon: "/icons/play/remote.webp" },
   story: { path: "/story", icon: "/icons/play/story.webp" },
   streak: { path: "/streak", icon: "/icons/play/streak.webp" },
   size: { path: "/size", icon: "/icons/play/size.webp" },
@@ -61,7 +63,7 @@ export const HEADER_BAR_TOOLS: ToolKey[] = (
 export const NAV_SECTIONS: { key: NavSectionKey; tools: ToolKey[] }[] = (
   [
     { key: "solo", tools: ["sundome", "shuttle", "board"] },
-    { key: "partner", tools: ["remote", "remoteList", "dglab"] },
+    { key: "partner", tools: ["remote", "remoteList", "dglab", "buttplug"] },
     { key: "read", tools: ["story"] },
     { key: "measure", tools: ["streak", "size", "stamina", "partners"] },
   ] as { key: NavSectionKey; tools: ToolKey[] }[]
@@ -75,7 +77,13 @@ export const NAV_SECTIONS: { key: NavSectionKey; tools: ToolKey[] }[] = (
   .filter((section) => section.tools.length > 0);
 
 /** Tools flagged with the NEW badge in the original UI. */
-export const NEW_TOOL_KEYS: ToolKey[] = ["shuttle", "board", "story", "dglab"];
+export const NEW_TOOL_KEYS: ToolKey[] = [
+  "shuttle",
+  "board",
+  "story",
+  "dglab",
+  "buttplug",
+];
 
 /** Footer index order. */
 export const FOOTER_TOOL_KEYS: ToolKey[] = [

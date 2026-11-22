@@ -34,6 +34,23 @@ export function DglabPanel({
     snap.status === "paired" || snap.status === "connected_ble";
   const bpConnected = bp.status === "connected";
   const anyConnected = connected || bpConnected;
+  const effectiveMode = !compact && snap.mode === "buttplug" ? "socket4" : snap.mode;
+  const transportTabs = (
+    compact
+      ? [
+          ["socket4", copy.tabSocket4],
+          ["socket", copy.tabSocket3],
+          ["ble3", copy.tabBle3],
+          ["ble2", copy.tabBle2],
+          ["buttplug", copy.tabButtplug],
+        ]
+      : [
+          ["socket4", copy.tabSocket4],
+          ["socket", copy.tabSocket3],
+          ["ble3", copy.tabBle3],
+          ["ble2", copy.tabBle2],
+        ]
+  ) as ReadonlyArray<readonly ["socket4" | "socket" | "ble3" | "ble2" | "buttplug", string]>;
 
   useEffect(() => {
     let active = true;
@@ -155,21 +172,13 @@ export function DglabPanel({
           >
           {/* Transport Mode Tabs */}
           <div className="flex flex-wrap gap-2">
-            {(
-              [
-                ["socket4", copy.tabSocket4],
-                ["socket", copy.tabSocket3],
-                ["ble3", copy.tabBle3],
-                ["ble2", copy.tabBle2],
-                ["buttplug", copy.tabButtplug],
-              ] as const
-            ).map(([m, label]) => (
+            {transportTabs.map(([m, label]) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => dglabManager.setMode(m)}
                 className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-xs font-bold ${
-                  snap.mode === m
+                  effectiveMode === m
                     ? "border-accent bg-accent-soft text-foreground"
                     : "border-card-border text-muted-strong hover:text-foreground"
                 }`}
@@ -180,10 +189,10 @@ export function DglabPanel({
           </div>
 
           {/* Connection Section */}
-          {snap.mode === "socket4" || snap.mode === "socket" ? (
+          {effectiveMode === "socket4" || effectiveMode === "socket" ? (
             <div className="space-y-3 rounded-xl border border-card-border bg-background/40 p-3.5">
               <p className="text-xs leading-relaxed text-muted-strong">
-                {snap.mode === "socket4" ? copy.socket4Lead : copy.socketLead}
+                {effectiveMode === "socket4" ? copy.socket4Lead : copy.socketLead}
               </p>
 
               {IS_STATIC_EXPORT && snap.wsEndpointMode === "lan" && (
@@ -283,7 +292,7 @@ export function DglabPanel({
                 </div>
               )}
 
-              {snap.mode === "socket4" && snap.status === "paired" && (
+              {effectiveMode === "socket4" && snap.status === "paired" && (
                 <div
                   className="space-y-1.5 border-t border-card-border pt-2.5"
                   data-dglab-v4-devices
@@ -326,7 +335,7 @@ export function DglabPanel({
                 </div>
               )}
             </div>
-          ) : snap.mode === "buttplug" ? (
+          ) : effectiveMode === "buttplug" ? (
             <div className="space-y-3 rounded-xl border border-card-border bg-background/40 p-3.5">
               <p className="text-xs leading-relaxed text-muted-strong">
                 {copy.buttplugLead}
@@ -547,27 +556,27 @@ export function DglabPanel({
                     disabled={!snap.bleSupported || !snap.secureContext}
                     onClick={() =>
                       void dglabManager.connectBle(
-                        snap.mode === "ble2" ? "ble2" : "ble3",
+                        effectiveMode === "ble2" ? "ble2" : "ble3",
                       )
                     }
                     className="rpri cursor-pointer rounded-xl px-4 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40"
                     data-dglab-connect-ble
                   >
-                    {snap.mode === "ble2" ? copy.connectBle2 : copy.connectBle3}
+                    {effectiveMode === "ble2" ? copy.connectBle2 : copy.connectBle3}
                   </button>
                 )}
               </div>
             </div>
           )}
 
-          {snap.errorText && snap.mode !== "buttplug" && (
+          {snap.errorText && effectiveMode !== "buttplug" && (
             <p className="text-xs font-semibold text-rose-300">
               {snap.errorText}
             </p>
           )}
 
           {/* Dual Channel Controls + Safety Caps */}
-          {snap.mode !== "buttplug" && (
+          {effectiveMode !== "buttplug" && (
           <>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
@@ -644,7 +653,7 @@ export function DglabPanel({
                       <span>
                         {copy.localCap}: <b className="text-foreground">{item.max}</b>
                       </span>
-                      {(snap.mode === "socket4" || snap.mode === "socket") && (
+                      {(effectiveMode === "socket4" || effectiveMode === "socket") && (
                         <span>
                           {copy.appMax}: {item.appMax}
                         </span>

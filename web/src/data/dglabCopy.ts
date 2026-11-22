@@ -272,9 +272,9 @@ export const DGLAB_COPY: Record<
     pageTitle: "DG-LAB Pulse Console",
     pageEyebrow: "Open-Source Hardware Integration",
     pageLead:
-      "Connect DG-LAB 4.0 / 3.0 / 2.0 (App QR V4/V3 or Web Bluetooth) and 750+ Buttplug.io / Intiface Central toys (Lovense, The Handy, OSR2, We-Vibe). Zero ads, local safety caps.",
-    cardTitle: "DG-LAB & Hardware Sync",
-    cardSub: "App V4/V3 · BLE 3.0/2.0 · Buttplug.io",
+      "Connect DG-LAB 4.0 / 3.0 / 2.0 via official App Socket V4 / V3 QR code or Web Bluetooth (Coyote, Opossum, Lynx). Zero ads, dual safety caps enforced locally.",
+    cardTitle: "DG-LAB E-Stim",
+    cardSub: "App Socket V4/V3 · BLE 3.0/2.0",
     expand: "Configure",
     collapse: "Hide",
     status: {
@@ -376,9 +376,9 @@ export const DGLAB_COPY: Record<
     pageTitle: "DG-LAB 脉冲控制台",
     pageEyebrow: "开源硬件联动",
     pageLead:
-      "全面支持 DG-LAB 4.0/3.0/2.0（App 扫码 V4/V3 或蓝牙直连）以及开源 Buttplug.io / Intiface Central（通吃 Lovense、The Handy、OSR2 等 750+ 成人硬件），与站内游戏及远控实时联动。",
-    cardTitle: "DG-LAB · 开源玩具联动",
-    cardSub: "郊狼 V4/V3 · 蓝牙 3.0/2.0 · Buttplug.io",
+      "全面支持 DG-LAB 4.0（Socket V4）及兼容 V3 / 蓝牙 3.0 & 2.0：支持 App 扫码直连内置中继或官方云节点（郊狼/负鼠/灵猫），也支持浏览器 Web Bluetooth 直连。",
+    cardTitle: "DG-LAB 郊狼联动",
+    cardSub: "App 扫码 V4/V3 · 蓝牙直连 3.0 / 2.0",
     expand: "展开配置",
     collapse: "收起",
     status: {

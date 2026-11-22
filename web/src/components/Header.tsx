@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getDictionary } from "@/data/i18n";
 import {
@@ -21,25 +21,52 @@ export function Header({ locale }: { locale: Locale }) {
   const dict = getDictionary(locale);
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [extOpen, setExtOpen] = useState(false);
+  const [extCenterX, setExtCenterX] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const extBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  // A navigation settles on a new pathname; drop the menu so it does not
+  const updateExtCenter = useCallback(() => {
+    const container = containerRef.current;
+    const btn = extBtnRef.current;
+    if (!container || !btn) return;
+    const cRect = container.getBoundingClientRect();
+    const bRect = btn.getBoundingClientRect();
+    if (cRect.width <= 0 || bRect.width <= 0) return;
+    const rawCenter = bRect.left - cRect.left + bRect.width / 2;
+    const clamped = Math.max(115, Math.min(cRect.width - 115, rawCenter));
+    setExtCenterX(Math.round(clamped));
+  }, []);
+
+  // A navigation settles on a new pathname; drop menus so they do not
   // linger over the next page.
   useEffect(() => {
     setMenuOpen(false);
+    setExtOpen(false);
   }, [pathname]);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    updateExtCenter();
+    window.addEventListener("resize", updateExtCenter);
+    return () => {
+      window.removeEventListener("resize", updateExtCenter);
+    };
+  }, [updateExtCenter]);
+
+  useEffect(() => {
+    if (!menuOpen && !extOpen) return;
 
     const isSmall = !window.matchMedia("(min-width: 640px)").matches;
     const previousOverflow = document.body.style.overflow;
-    if (isSmall) {
+    if (menuOpen && isSmall) {
       document.body.style.overflow = "hidden";
     }
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setMenuOpen(false);
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        setExtOpen(false);
+      }
     }
     function onPointerDown(event: PointerEvent) {
       if (
@@ -48,6 +75,7 @@ export function Header({ locale }: { locale: Locale }) {
         !containerRef.current.contains(event.target)
       ) {
         setMenuOpen(false);
+        setExtOpen(false);
       }
     }
 
@@ -55,19 +83,22 @@ export function Header({ locale }: { locale: Locale }) {
     document.addEventListener("pointerdown", onPointerDown);
 
     return () => {
-      if (isSmall) {
+      if (menuOpen && isSmall) {
         document.body.style.overflow = previousOverflow;
       }
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [menuOpen]);
+  }, [menuOpen, extOpen]);
 
   const homeHref = localePath(locale, "");
 
   function isActive(path: string) {
     return pathname === localePath(locale, path);
   }
+
+  const onHardwareRoute =
+    isActive(TOOL_META.dglab.path) || isActive(TOOL_META.buttplug.path);
 
   return (
     <header className="sticky top-0 z-50 border-b border-card-border bg-background/60 pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
@@ -106,6 +137,47 @@ export function Header({ locale }: { locale: Locale }) {
               {locale === "zh" ? "主页" : "Home"}
             </Link>
             {HEADER_BAR_TOOLS.map((key) => {
+              if (key === "dglab") {
+                const highlighted = extOpen || onHardwareRoute;
+                return (
+                  <button
+                    key="external"
+                    ref={extBtnRef}
+                    type="button"
+                    aria-expanded={extOpen}
+                    aria-controls="external-hardware-bar"
+                    data-header-bar-item="external"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      updateExtCenter();
+                      setExtOpen((v) => !v);
+                    }}
+                    className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+                      highlighted
+                        ? "border-accent/55 bg-accent-soft text-foreground shadow-sm shadow-accent/15"
+                        : "border-transparent text-foreground-soft hover:bg-category-bg-hover hover:text-foreground"
+                    }`}
+                  >
+                    <span>{locale === "zh" ? "外部联动" : "Hardware"}</span>
+                    <svg
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      aria-hidden="true"
+                      className={`h-3.5 w-3.5 transition-transform duration-300 ease-out ${
+                        extOpen ? "rotate-180" : "rotate-0"
+                      }`}
+                    >
+                      <path
+                        d="M4 6l4 4 4-4"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                );
+              }
               const href = localePath(locale, TOOL_META[key].path);
               return (
                 <Link
@@ -134,7 +206,10 @@ export function Header({ locale }: { locale: Locale }) {
               aria-expanded={menuOpen}
               aria-controls="site-menu"
               data-site-menu-toggle=""
-              onClick={() => setMenuOpen((value) => !value)}
+              onClick={() => {
+                setExtOpen(false);
+                setMenuOpen((value) => !value);
+              }}
               className="glass relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-soft transition-transform duration-150 hover:text-foreground active:scale-95"
             >
               <span
@@ -158,6 +233,65 @@ export function Header({ locale }: { locale: Locale }) {
                 <CloseIcon />
               </span>
             </button>
+          </div>
+        </div>
+
+        <div
+          id="external-hardware-bar"
+          aria-hidden={!extOpen}
+          className={`hidden transition-[grid-template-rows,opacity] duration-300 ease-out lg:grid ${
+            extOpen
+              ? "grid-rows-[1fr] opacity-100"
+              : "pointer-events-none grid-rows-[0fr] opacity-0"
+          }`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="border-t border-card-border/60">
+              <div
+                className="w-fit -translate-x-1/2"
+                style={{
+                  marginLeft: extCenterX !== null ? `${extCenterX}px` : "50%",
+                }}
+              >
+                <div
+                  className={`flex items-center gap-2 whitespace-nowrap py-2 transition-[opacity,translate] duration-300 ease-out ${
+                    extOpen ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0"
+                  }`}
+                >
+                {(
+                  [
+                    {
+                      key: "dglab",
+                      label: "DG-LAB",
+                      href: localePath(locale, TOOL_META.dglab.path),
+                      active: isActive(TOOL_META.dglab.path),
+                    },
+                    {
+                      key: "buttplug",
+                      label: "Buttplug.io",
+                      href: localePath(locale, TOOL_META.buttplug.path),
+                      active: isActive(TOOL_META.buttplug.path),
+                    },
+                  ] as const
+                ).map((item) => (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    tabIndex={extOpen ? undefined : -1}
+                    data-header-sub-item={item.key}
+                    onClick={() => setExtOpen(false)}
+                    className={`rounded-full border px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+                      item.active
+                        ? "border-accent/45 bg-accent-soft text-accent"
+                        : "border-transparent text-foreground-soft hover:bg-category-bg-hover hover:text-foreground"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
