@@ -154,7 +154,7 @@ export function Header({ locale }: { locale: Locale }) {
           id="site-menu"
           aria-label={dict.header.menuAria}
           aria-hidden={!menuOpen}
-          className={`absolute inset-x-0 top-full z-50 h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] origin-top overflow-y-auto overscroll-contain bg-background px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2 transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[opacity,transform] sm:inset-x-auto sm:right-4 sm:mt-2 sm:h-auto sm:max-h-[calc(100dvh-5.5rem)] sm:w-[min(40rem,calc(100vw-2rem))] sm:origin-top-right sm:rounded-2xl sm:border sm:border-card-border sm:bg-background sm:p-4 sm:shadow-2xl sm:shadow-black/60 ${
+          className={`absolute inset-x-0 top-full z-50 h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] origin-top overflow-y-auto overscroll-contain bg-background px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2 transition-[opacity,transform] duration-200 ease-out sm:inset-x-auto sm:right-4 sm:mt-2 sm:h-auto sm:max-h-[calc(100dvh-5.5rem)] sm:w-[min(40rem,calc(100vw-2rem))] sm:origin-top-right sm:rounded-2xl sm:border sm:border-card-border sm:bg-background sm:p-4 sm:shadow-2xl sm:shadow-black/60 ${
             menuOpen
               ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
               : "pointer-events-none -translate-y-1.5 scale-[0.97] opacity-0"
