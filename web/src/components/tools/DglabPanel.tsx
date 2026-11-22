@@ -100,18 +100,47 @@ export function DglabPanel({
           {compact && (
             <button
               type="button"
+              aria-expanded={open}
               onClick={() => setOpen((v) => !v)}
-              className="cursor-pointer rounded-full border border-card-border px-3 py-1 text-xs font-bold text-foreground hover:border-accent"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-card-border px-3 py-1 text-xs font-bold text-foreground transition-all duration-200 hover:border-accent active:scale-95"
               data-dglab-toggle
             >
-              {open ? copy.collapse : copy.expand}
+              <span>{open ? copy.collapse : copy.expand}</span>
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                aria-hidden="true"
+                className={`h-3.5 w-3.5 transition-transform duration-300 ease-out ${
+                  open ? "rotate-180" : "rotate-0"
+                }`}
+              >
+                <path
+                  d="M4 6l4 4 4-4"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
           )}
         </div>
       </div>
 
-      {open && (
-        <div className="mt-4 space-y-5 border-t border-card-border pt-4">
+      <div
+        aria-hidden={!open}
+        className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${
+          open
+            ? "mt-4 grid-rows-[1fr] opacity-100"
+            : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div
+            className={`space-y-5 border-t border-card-border pt-4 transition-transform duration-300 ease-out ${
+              open ? "translate-y-0" : "-translate-y-1.5"
+            }`}
+          >
           {/* Transport Mode Tabs */}
           <div className="flex flex-wrap gap-2">
             {(
@@ -486,8 +515,9 @@ export function DglabPanel({
           <p className="text-[11px] leading-relaxed text-muted">
             {copy.safetyNote}
           </p>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
