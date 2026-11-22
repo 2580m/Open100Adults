@@ -124,11 +124,11 @@ export function Header({ locale }: { locale: Locale }) {
               aria-controls="site-menu"
               data-site-menu-toggle=""
               onClick={() => setMenuOpen((value) => !value)}
-              className="glass relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-soft transition-all duration-200 hover:text-foreground active:scale-95"
+              className="glass relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-soft transition-transform duration-150 hover:text-foreground active:scale-95"
             >
               <span
                 aria-hidden="true"
-                className={`absolute flex items-center justify-center transition-all duration-200 ease-out ${
+                className={`absolute flex items-center justify-center transition-[opacity,transform] duration-150 ease-out ${
                   menuOpen
                     ? "rotate-90 scale-75 opacity-0"
                     : "rotate-0 scale-100 opacity-100"
@@ -138,7 +138,7 @@ export function Header({ locale }: { locale: Locale }) {
               </span>
               <span
                 aria-hidden="true"
-                className={`absolute flex items-center justify-center transition-all duration-200 ease-out ${
+                className={`absolute flex items-center justify-center transition-[opacity,transform] duration-150 ease-out ${
                   menuOpen
                     ? "rotate-0 scale-100 opacity-100"
                     : "-rotate-90 scale-75 opacity-0"
@@ -154,10 +154,10 @@ export function Header({ locale }: { locale: Locale }) {
           id="site-menu"
           aria-label={dict.header.menuAria}
           aria-hidden={!menuOpen}
-          className={`absolute inset-x-0 top-full z-50 h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] origin-top overflow-y-auto overscroll-contain bg-background px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2 transition-[opacity,transform,visibility] duration-200 ease-out sm:inset-x-auto sm:right-4 sm:mt-2 sm:h-auto sm:max-h-[calc(100dvh-5.5rem)] sm:w-[min(40rem,calc(100vw-2rem))] sm:origin-top-right sm:rounded-2xl sm:border sm:border-card-border sm:bg-background/95 sm:p-4 sm:shadow-2xl sm:shadow-black/60 sm:backdrop-blur-xl ${
+          className={`absolute inset-x-0 top-full z-50 h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] origin-top overflow-y-auto overscroll-contain bg-background px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2 transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[opacity,transform] sm:inset-x-auto sm:right-4 sm:mt-2 sm:h-auto sm:max-h-[calc(100dvh-5.5rem)] sm:w-[min(40rem,calc(100vw-2rem))] sm:origin-top-right sm:rounded-2xl sm:border sm:border-card-border sm:bg-background sm:p-4 sm:shadow-2xl sm:shadow-black/60 ${
             menuOpen
-              ? "pointer-events-auto visible translate-y-0 scale-100 opacity-100"
-              : "pointer-events-none invisible -translate-y-2 scale-95 opacity-0"
+              ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
+              : "pointer-events-none -translate-y-1.5 scale-[0.97] opacity-0"
           }`}
         >
           <div className="grid gap-x-6 sm:grid-cols-2">
@@ -177,6 +177,7 @@ export function Header({ locale }: { locale: Locale }) {
                         <Link
                           href={localePath(locale, meta.path)}
                           data-header-tool={key}
+                          tabIndex={menuOpen ? undefined : -1}
                           onClick={() => setMenuOpen(false)}
                           className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl px-1.5 py-1.5 transition-colors hover:bg-category-bg-hover"
                         >
@@ -186,7 +187,7 @@ export function Header({ locale }: { locale: Locale }) {
                             alt=""
                             width={36}
                             height={36}
-                            loading="lazy"
+                            decoding="async"
                             className="h-9 w-9 shrink-0 rounded-[10px]"
                           />
                           <span className="min-w-0 flex-1 text-[15px] font-bold text-foreground [overflow-wrap:anywhere] [word-break:keep-all]">

@@ -129,15 +129,15 @@ export function DglabPanel({
 
       <div
         aria-hidden={!open}
-        className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${
+        className={`grid transition-[grid-template-rows,opacity] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           open
-            ? "mt-4 grid-rows-[1fr] opacity-100"
-            : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"
+            ? "grid-rows-[1fr] opacity-100"
+            : "pointer-events-none grid-rows-[0fr] opacity-0"
         }`}
       >
         <div className="min-h-0 overflow-hidden">
           <div
-            className={`space-y-5 border-t border-card-border pt-4 transition-transform duration-300 ease-out ${
+            className={`mt-4 space-y-5 border-t border-card-border pt-4 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
               open ? "translate-y-0" : "-translate-y-1.5"
             }`}
           >
