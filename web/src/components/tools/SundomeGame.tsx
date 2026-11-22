@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 
+import { DglabPanel } from "@/components/tools/DglabPanel";
 import { ReactSettingsModal, GearIcon } from "@/components/tools/RemoteCtlSettingsModal";
 import {
   Phrase,
@@ -80,6 +81,7 @@ import {
   type RemoteWishKey,
   type RoomCredentials,
 } from "@/lib/remoteProtocol";
+import { dglabManager, useDglab } from "@/lib/dglab";
 import {
   ZH_ACTORS,
   defaultVoiceActor,
@@ -190,6 +192,9 @@ export function SundomeGame({
 
   const { publicOrigin } = usePublicOrigin();
   const reactPrefs = useReactPrefs();
+  const dglabSnap = useDglab();
+  const dglabRef = useRef(dglabSnap);
+  dglabRef.current = dglabSnap;
   const actorLabels = useMemo(() => voiceActorLabels(), []);
 
   // Core setup state
@@ -643,6 +648,19 @@ export function SundomeGame({
         level: arousalRef.current || undefined,
         at: nextCmdAtRef.current || undefined,
         ...(wireOutcome ? { outcome: wireOutcome } : {}),
+        ...(dglabManager.isConnected()
+          ? {
+              dglab: {
+                on: true,
+                allowRemote: dglabRef.current.prefs.allowRemote,
+                a: dglabRef.current.strengthA,
+                b: dglabRef.current.strengthB,
+                maxA: Math.min(dglabRef.current.maxA, dglabRef.current.appLimitA),
+                maxB: Math.min(dglabRef.current.maxB, dglabRef.current.appLimitB),
+                wave: dglabRef.current.waveA,
+              },
+            }
+          : {}),
       };
     },
     [locale, wishes],
@@ -833,6 +851,32 @@ export function SundomeGame({
             }
             return;
           }
+          if (msg.t === "dglab") {
+            if (!dglabManager.isConnected() || !dglabRef.current.prefs.allowRemote) {
+              return;
+            }
+            if (msg.k === "zero") {
+              dglabManager.emergencyStop();
+            } else if (msg.k === "wave" && msg.wave) {
+              dglabManager.setWavePreset(msg.wave, "both");
+            } else if (msg.k === "pct" && typeof msg.pct === "number") {
+              const snapNow = dglabRef.current;
+              const capA = Math.min(snapNow.maxA, snapNow.appLimitA);
+              const capB = Math.min(snapNow.maxB, snapNow.appLimitB);
+              dglabManager.setOutputActive(msg.pct > 0);
+              dglabManager.setChannelStrength("A", Math.round((capA * msg.pct) / 100));
+              if (!snapNow.prefs.channelBLink) {
+                dglabManager.setChannelStrength(
+                  "B",
+                  Math.round((capB * (msg.bPct ?? msg.pct)) / 100),
+                );
+              }
+            } else if (msg.k === "burst") {
+              dglabManager.triggerBurst(msg.wave ?? "punish", 1500, msg.pct ?? 85);
+            }
+            sendStateNow();
+            return;
+          }
         },
         (st) => {
           setRemoteStatus(st);
@@ -883,6 +927,35 @@ export function SundomeGame({
       remoteLinkRef.current?.stop();
     };
   }, [connectRemoteLink, remoteInvite]);
+
+  // Auto-sync DG-LAB output with Sundome play phase & current command
+  useEffect(() => {
+    if (!dglabManager.isConnected() || !dglabSnap.prefs.autoSync) return;
+    if (phase === "playing" || phase === "overtime") {
+      dglabManager.applyGameCue({
+        active: true,
+        mode: command.type === "stroke" ? "stroke" : command.type,
+        bpm: command.bpm || 90,
+      });
+    } else {
+      dglabManager.applyGameCue({
+        active: false,
+        mode:
+          phase === "denied"
+            ? "denied"
+            : phase === "ruined"
+              ? "ruin"
+              : "stop",
+      });
+    }
+  }, [
+    command.bpm,
+    command.type,
+    dglabSnap.prefs.autoSync,
+    dglabSnap.prefs.zeroOnStop,
+    dglabSnap.status,
+    phase,
+  ]);
 
   // Clean up WS on unmount
   useEffect(() => {
@@ -1215,6 +1288,9 @@ export function SundomeGame({
     setCmdCount((c) => c + 1);
     recordTraceSeg("stop");
     remoteLinkRef.current?.send({ t: "signal", k: "limit" });
+    if (dglabManager.isConnected() && dglabRef.current.prefs.edgeShock) {
+      dglabManager.triggerBurst("punish", 1500, 80);
+    }
     speakText(adaptVariantText(stopCmd.text, locale, body));
     sendStateNow();
   }
@@ -2008,6 +2084,17 @@ export function SundomeGame({
             </span>
 
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              {(dglabSnap.status === "paired" ||
+                dglabSnap.status === "connected_ble") && (
+                <button
+                  type="button"
+                  onClick={() => dglabManager.emergencyStop()}
+                  data-sundome-dglab-estop
+                  className="inline-flex h-7 cursor-pointer items-center justify-center rounded-full border border-rose-400/60 bg-rose-600/35 px-2.5 text-xs font-bold text-rose-100 hover:bg-rose-600/55"
+                >
+                  A:{dglabSnap.strengthA} · {locale === "zh" ? "急停" : "Stop"}
+                </button>
+              )}
               {videoUrl && (
                 <button
                   type="button"
@@ -2891,11 +2978,16 @@ export function SundomeGame({
                     </summary>
                     {renderExtraSettings()}
                   </details>
+
+                  <DglabPanel locale={locale} compact />
                 </>
               )}
 
               {/* Extra Settings directly open in solo setup */}
               {!remoteOnly && !remoteInvite && renderExtraSettings()}
+              {!remoteOnly && !remoteInvite && (
+                <DglabPanel locale={locale} compact />
+              )}
             </div>
           )}
 

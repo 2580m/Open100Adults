@@ -68,6 +68,7 @@ export const en: Dictionary = {
       board: "Edges & Ladders",
       remote: "Remote play",
       remoteList: "People waiting for commands",
+      dglab: "DG-LAB Pulse Console",
       story: "Edging Stories",
       streak: "Streak Counter",
       size: "Penis Size Percentile Checker",
@@ -98,6 +99,7 @@ export const en: Dictionary = {
       remote:
         "Your partner presses the instruction buttons. Just send them a link",
       remoteList: "Pick someone from the list and give the commands",
+      dglab: "Pair Coyote 2.0/3.0 via App QR or Web Bluetooth",
       story: "Stories with different endings",
       streak: "What day you're on, in one tap",
       size: "Your percentile from length and girth",
@@ -110,6 +112,7 @@ export const en: Dictionary = {
       board: "Dice",
       remote: "For 2",
       remoteList: "List",
+      dglab: "SDK",
       story: "",
       streak: "",
       size: "",

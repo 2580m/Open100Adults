@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import type { WavePresetKey } from "@/data/dglabCopy";
 import {
   REMOTE_CONSTANTS,
   REMOTE_V2,
@@ -110,6 +111,22 @@ export type RemoteMessage =
       edge?: boolean;
       cool?: boolean;
       wish?: RemoteWishKey[];
+      dglab?: {
+        on: boolean;
+        allowRemote: boolean;
+        a: number;
+        b: number;
+        maxA: number;
+        maxB: number;
+        wave: WavePresetKey;
+      };
+    }
+  | {
+      t: "dglab";
+      k: "wave" | "pct" | "burst" | "zero";
+      wave?: WavePresetKey;
+      pct?: number;
+      bPct?: number;
     }
   | { t: "drive"; k: "auto" | "stop" | number }
   | { t: "cmd"; k: "fast" | "slow" | "stop" | "go" }

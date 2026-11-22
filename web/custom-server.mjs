@@ -690,6 +690,170 @@ function handleRwsHttp(res, pathname, url) {
   return sendJson(res, 404, { error: "not_found" });
 }
 
+// ---- DG-LAB Socket Control V3 Relay (/dglab-ws) ----
+const dglabClients = new Map();
+const dglabRelations = new Map(); // controllerClientId -> appTargetId
+
+function findDglabRelation(id) {
+  for (const [cId, tId] of dglabRelations.entries()) {
+    if (cId === id || tId === id) return [cId, tId];
+  }
+  return null;
+}
+
+const dglabWss = new WebSocketServer({ noServer: true });
+
+dglabWss.on("connection", (ws, _req, routeTargetId) => {
+  const connId = crypto.randomUUID();
+  ws._dglabId = connId;
+  ws._dglabRouteTarget = routeTargetId || "";
+  dglabClients.set(connId, ws);
+
+  sendWs(ws, {
+    type: "bind",
+    clientId: connId,
+    targetId: "",
+    message: "targetId",
+  });
+
+  ws.on("message", (raw) => {
+    let data;
+    try {
+      data = JSON.parse(String(raw));
+    } catch {
+      sendWs(ws, { type: "error", clientId: "", targetId: "", message: "403" });
+      return;
+    }
+    if (!data || typeof data !== "object") {
+      sendWs(ws, { type: "error", clientId: "", targetId: "", message: "403" });
+      return;
+    }
+
+    const type = String(data.type || "");
+    const cId = String(data.clientId || ws._dglabRouteTarget || "");
+    const tId = String(data.targetId || (cId && cId !== connId ? connId : ""));
+
+    if (type === "heartbeat") {
+      const rel = findDglabRelation(connId);
+      const partnerId = rel ? (rel[0] === connId ? rel[1] : rel[0]) : "";
+      sendWs(ws, {
+        type: "heartbeat",
+        clientId: connId,
+        targetId: partnerId,
+        message: "200",
+      });
+      return;
+    }
+
+    if (type === "bind") {
+      if (data.message !== "DGLAB") {
+        sendWs(ws, {
+          type: "bind",
+          clientId: cId,
+          targetId: tId,
+          message: "403",
+        });
+        return;
+      }
+      if (!cId || !tId || !dglabClients.has(cId) || !dglabClients.has(tId)) {
+        sendWs(ws, {
+          type: "bind",
+          clientId: cId,
+          targetId: tId,
+          message: "401",
+        });
+        return;
+      }
+      if (findDglabRelation(cId) || findDglabRelation(tId)) {
+        sendWs(ws, {
+          type: "bind",
+          clientId: cId,
+          targetId: tId,
+          message: "400",
+        });
+        return;
+      }
+      dglabRelations.set(cId, tId);
+      const okPayload = {
+        type: "bind",
+        clientId: cId,
+        targetId: tId,
+        message: "200",
+      };
+      sendWs(dglabClients.get(cId), okPayload);
+      sendWs(dglabClients.get(tId), okPayload);
+      return;
+    }
+
+    if (type === "msg" || type === "cmd" || type === "clientMsg") {
+      if (!cId || !tId || dglabRelations.get(cId) !== tId) {
+        sendWs(ws, {
+          type: "msg",
+          clientId: cId,
+          targetId: tId,
+          message: "402",
+        });
+        return;
+      }
+      const cWs = dglabClients.get(cId);
+      const tWs = dglabClients.get(tId);
+      const peer = ws === cWs ? tWs : cWs;
+      if (!peer || peer.readyState !== 1) {
+        sendWs(ws, {
+          type: "msg",
+          clientId: cId,
+          targetId: tId,
+          message: "404",
+        });
+        return;
+      }
+      sendWs(peer, {
+        type: "msg",
+        clientId: cId,
+        targetId: tId,
+        message: String(data.message ?? ""),
+      });
+      return;
+    }
+
+    sendWs(ws, { type: "error", clientId: cId, targetId: tId, message: "403" });
+  });
+
+  const cleanup = () => {
+    dglabClients.delete(connId);
+    const rel = findDglabRelation(connId);
+    if (rel) {
+      const [cId, tId] = rel;
+      dglabRelations.delete(cId);
+      const partnerId = cId === connId ? tId : cId;
+      sendWs(dglabClients.get(partnerId), {
+        type: "break",
+        clientId: cId,
+        targetId: tId,
+        message: "209",
+      });
+    }
+  };
+
+  ws.on("close", cleanup);
+  ws.on("error", cleanup);
+});
+
+const dglabHeartbeatTimer = setInterval(() => {
+  for (const [id, ws] of dglabClients.entries()) {
+    if (ws.readyState !== 1) continue;
+    const rel = findDglabRelation(id);
+    const partnerId = rel ? (rel[0] === id ? rel[1] : rel[0]) : "";
+    sendWs(ws, {
+      type: "heartbeat",
+      clientId: id,
+      targetId: partnerId,
+      message: "200",
+    });
+  }
+}, 30_000);
+dglabHeartbeatTimer.unref?.();
+
 // ---- Boot Next.js App + HTTP/WS Server ----
 const app = next({ dev, hostname, port, dir: __dirname });
 const handle = app.getRequestHandler();
@@ -721,6 +885,16 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === "/api/rgate/public-url") {
     return sendJson(res, 200, { ok: true, ...getPublicOriginInfo() });
+  }
+
+  if (pathname === "/api/dglab/info") {
+    return sendJson(res, 200, {
+      ok: true,
+      wsPath: "/dglab-ws",
+      activeClients: dglabClients.size,
+      activePairs: dglabRelations.size,
+      ...getPublicOriginInfo(),
+    });
   }
 
   if (pathname === "/api/rgate/lobby") {
@@ -756,6 +930,14 @@ server.on("upgrade", (req, socket, head) => {
     url = new URL(req.url || "/", `http://${reqHost}`);
   } catch {
     socket.destroy();
+    return;
+  }
+
+  const dglabMatch = url.pathname.match(/^\/dglab-ws(?:\/([A-Za-z0-9_-]+))?$/);
+  if (dglabMatch) {
+    dglabWss.handleUpgrade(req, socket, head, (ws) => {
+      dglabWss.emit("connection", ws, req, dglabMatch[1] || "");
+    });
     return;
   }
 

@@ -4,6 +4,7 @@ export const TOOL_KEYS = [
   "board",
   "remote",
   "remoteList",
+  "dglab",
   "story",
   "streak",
   "size",
@@ -33,6 +34,7 @@ export const TOOL_META: Record<ToolKey, ToolMeta> = {
   board: { path: "/board", icon: "/icons/play/board.webp" },
   remote: { path: "/sundome/remote", icon: "/icons/play/remote.webp" },
   remoteList: { path: "/sundome/remote/list", icon: "/icons/play/remote.webp" },
+  dglab: { path: "/dglab", icon: "/icons/play/remote.webp" },
   story: { path: "/story", icon: "/icons/play/story.webp" },
   streak: { path: "/streak", icon: "/icons/play/streak.webp" },
   size: { path: "/size", icon: "/icons/play/size.webp" },
@@ -52,25 +54,33 @@ export function assetPath(path: string): string {
 
 /** Desktop header links, in the original order. */
 export const HEADER_BAR_TOOLS: ToolKey[] = (
-  ["sundome", "shuttle", "board", "remote", "story"] as ToolKey[]
+  ["sundome", "shuttle", "board", "remote", "dglab", "story"] as ToolKey[]
 ).filter((key) => !IS_STATIC_EXPORT || key !== "remote");
 
 /** Grouping used by the mobile menu and the home page. */
 export const NAV_SECTIONS: { key: NavSectionKey; tools: ToolKey[] }[] = (
   [
     { key: "solo", tools: ["sundome", "shuttle", "board"] },
-    { key: "partner", tools: ["remote", "remoteList"] },
+    { key: "partner", tools: ["remote", "remoteList", "dglab"] },
     { key: "read", tools: ["story"] },
     { key: "measure", tools: ["streak", "size", "stamina", "partners"] },
   ] as { key: NavSectionKey; tools: ToolKey[] }[]
-).filter((section) => !IS_STATIC_EXPORT || section.key !== "partner");
+)
+  .map((section) => ({
+    ...section,
+    tools: IS_STATIC_EXPORT
+      ? section.tools.filter((t) => t !== "remote" && t !== "remoteList")
+      : section.tools,
+  }))
+  .filter((section) => section.tools.length > 0);
 
 /** Tools flagged with the NEW badge in the original UI. */
-export const NEW_TOOL_KEYS: ToolKey[] = ["shuttle", "board", "story"];
+export const NEW_TOOL_KEYS: ToolKey[] = ["shuttle", "board", "story", "dglab"];
 
 /** Footer index order. */
 export const FOOTER_TOOL_KEYS: ToolKey[] = [
   "sundome",
+  "dglab",
   "streak",
   "size",
   "stamina",

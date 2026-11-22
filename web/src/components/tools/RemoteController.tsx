@@ -14,6 +14,7 @@ import {
   CtlSettingsModal,
   GearIcon,
 } from "@/components/tools/RemoteCtlSettingsModal";
+import { DGLAB_COPY, WAVE_NAMES, WAVE_PRESET_KEYS, type WavePresetKey } from "@/data/dglabCopy";
 import { RemoteLobby } from "@/components/tools/RemoteLobby";
 import {
   Phrase,
@@ -629,6 +630,7 @@ interface PadViewProps {
   onThx: (k: "thanks" | "fun" | "again") => void;
   onEnd: () => void;
   onNextPerson?: () => void;
+  onDglab?: (cmd: Extract<RemoteMessage, { t: "dglab" }>) => void;
 }
 
 function ControllerDeck(props: PadViewProps) {
@@ -1684,6 +1686,103 @@ function ControllerDeck(props: PadViewProps) {
               </span>
             </p>
           )}
+
+          {state?.dglab?.on && (
+            <div
+              className="mt-2 rounded-2xl border border-white/15 bg-black/35 p-3 text-left"
+              data-remote-dglab
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="font-bold text-foreground">
+                  {DGLAB_COPY[lang].remoteSectionTitle}
+                </span>
+                <span className="tabular-nums font-bold text-accent">
+                  A:{state.dglab.a}/{state.dglab.maxA} · B:{state.dglab.b}/{state.dglab.maxB}
+                </span>
+              </div>
+              {!state.dglab.allowRemote ? (
+                <p className="mt-1.5 text-[11px] text-muted-strong">
+                  {DGLAB_COPY[lang].remoteDisabled}
+                </p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  <div className="flex flex-wrap gap-1">
+                    {WAVE_PRESET_KEYS.map((wk: WavePresetKey) => (
+                      <button
+                        key={wk}
+                        type="button"
+                        disabled={!props.playing}
+                        onClick={() =>
+                          props.onDglab?.({ t: "dglab", k: "wave", wave: wk })
+                        }
+                        className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${
+                          state.dglab?.wave === wk
+                            ? "border-accent bg-accent text-white"
+                            : "border-white/20 text-white/80 hover:border-white/40"
+                        }`}
+                      >
+                        {WAVE_NAMES[lang][wk]}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[25, 50, 75, 100].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        disabled={!props.playing}
+                        onClick={() =>
+                          props.onDglab?.({ t: "dglab", k: "pct", pct })
+                        }
+                        className="rounded-lg border border-white/20 px-2 py-1 text-[11px] font-bold text-white/85 hover:bg-white/10"
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={!props.playing}
+                      onClick={() =>
+                        props.onDglab?.({
+                          t: "dglab",
+                          k: "burst",
+                          wave: "tease",
+                        })
+                      }
+                      className="rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/20"
+                    >
+                      {DGLAB_COPY[lang].remoteTease}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!props.playing}
+                      onClick={() =>
+                        props.onDglab?.({
+                          t: "dglab",
+                          k: "burst",
+                          wave: "punish",
+                        })
+                      }
+                      className="rounded-lg border border-rose-400/50 bg-rose-500/25 px-2.5 py-1 text-[11px] font-bold text-rose-100 hover:bg-rose-500/40"
+                    >
+                      {DGLAB_COPY[lang].remoteShock}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!props.live}
+                      onClick={() => props.onDglab?.({ t: "dglab", k: "zero" })}
+                      className="ml-auto rounded-lg border border-white/20 px-2.5 py-1 text-[11px] font-bold text-white/75 hover:bg-white/10"
+                    >
+                      {DGLAB_COPY[lang].remoteZero}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-white/60">
+                    {DGLAB_COPY[lang].remoteCapNote}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <p
@@ -2418,6 +2517,7 @@ export function RemoteController({ lang }: { lang: Locale }) {
       onNextPerson={
         creds.open ? () => sendMsg({ t: "end" }) : undefined
       }
+      onDglab={(cmd) => sendMsg(cmd)}
     />
   );
 }

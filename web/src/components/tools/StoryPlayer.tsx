@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { DglabPanel } from "@/components/tools/DglabPanel";
 import { storyCopy } from "@/data/storyCopy";
 import type { Story, StoryPhase } from "@/data/stories/types";
 import { localePath, type Locale } from "@/data/tools";
+import { dglabManager, useDglab } from "@/lib/dglab";
 
 type Phase =
   | "idle"
@@ -591,6 +593,46 @@ export function StoryPlayer({
   }, []);
 
   const ending = endingKind ? story.endings[endingKind] : undefined;
+  const dglabSnap = useDglab();
+  useEffect(() => {
+    if (!dglabManager.isConnected() || !dglabSnap.prefs.autoSync) return;
+    if (phase === "idle" || phase === "ending" || paused) {
+      dglabManager.applyGameCue({
+        active: false,
+        mode: endingKind === "ruin" ? "ruin" : endingKind === "deny" ? "denied" : "stop",
+      });
+      return;
+    }
+    const mode =
+      phase === "slow"
+        ? "slow"
+        : phase === "rest" || phase === "cooldown" || phase === "ask" || phase === "choice"
+          ? "stop"
+          : phase === "ruin"
+            ? "ruin"
+            : phase === "deny"
+              ? "denied"
+              : phase === "allow" || phase === "count" || phase === "build"
+                ? "finale"
+                : "stroke";
+    const activeBpm =
+      phase === "build"
+        ? phaseData?.bpm ?? 90
+        : segment?.bpm ?? phaseData?.bpm ?? 70;
+    dglabManager.applyGameCue({
+      active: true,
+      mode,
+      bpm: activeBpm,
+    });
+  }, [
+    dglabSnap.prefs.autoSync,
+    dglabSnap.status,
+    endingKind,
+    paused,
+    phase,
+    phaseData?.bpm,
+    segment?.bpm,
+  ]);
   const afterText =
     endingKind === "allow"
       ? fill(story.finale.after?.c)
@@ -638,6 +680,10 @@ export function StoryPlayer({
         >
           ← {player.backToStories}
         </Link>
+
+        <div className="mt-5">
+          <DglabPanel locale={locale} compact />
+        </div>
 
         {gateOpen && !accepted ? (
           <div
@@ -914,6 +960,8 @@ export function StoryPlayer({
         </Link>
         <span>{story.title}</span>
       </div>
+
+      <DglabPanel locale={locale} compact />
     </div>
   );
 }

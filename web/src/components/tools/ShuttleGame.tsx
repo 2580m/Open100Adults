@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { DglabPanel } from "@/components/tools/DglabPanel";
 import {
   SHUTTLE_LEVELS,
   SHUTTLE_MAX,
   type ShuttleCopy,
 } from "@/data/shuttleCopy";
 import { localePath, type Locale } from "@/data/tools";
+import { dglabManager, useDglab } from "@/lib/dglab";
 
 const SCALE = [261.63, 293.66, 329.63, 349.23, 392.0, 440.0, 493.88, 523.25];
 const BEST_KEY = "shuttle:best";
@@ -308,6 +310,26 @@ export function ShuttleGame({
   const config = SHUTTLE_LEVELS[Math.min(level, SHUTTLE_LEVELS.length) - 1];
   const handsOff = mode === "stops" && leg === "back" && status === "playing";
   const progress = config ? (completedInLevel / config.shuttles) * 100 : 0;
+  const dglabSnap = useDglab();
+
+  useEffect(() => {
+    if (!dglabManager.isConnected() || !dglabSnap.prefs.autoSync) return;
+    if (status !== "playing") {
+      dglabManager.applyGameCue({ active: false, mode: "stop" });
+      return;
+    }
+    const levelBpm = config
+      ? Math.max(60, Math.min(240, Math.round((NOTES_PER_SHUTTLE / config.seconds) * 60)))
+      : 90;
+    const pct = Math.min(95, 25 + Math.round((level / SHUTTLE_LEVELS.length) * 65));
+    dglabManager.applyGameCue({
+      active: true,
+      mode: handsOff ? "stop" : "stroke",
+      bpm: levelBpm,
+      intensityPct: handsOff ? 0 : pct,
+      wave: level >= 12 ? "surge" : "metronome",
+    });
+  }, [config, dglabSnap.prefs.autoSync, dglabSnap.status, handsOff, level, status]);
 
   return (
     <div className="space-y-4">
@@ -490,6 +512,8 @@ export function ShuttleGame({
           </div>
         ) : null}
       </div>
+
+      <DglabPanel locale={locale} compact />
 
       {gateOpen && !accepted ? (
         <div
